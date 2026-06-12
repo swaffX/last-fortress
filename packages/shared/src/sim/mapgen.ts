@@ -13,18 +13,22 @@ const CLEAR_RADIUS = 12;
 export function generateMap(rng: Rng): MapData {
   const nodes: MapData['nodes'] = [];
   const used = new Set<string>();
-  // forest clusters
-  for (let c = 0; c < 14; c++) {
+  // forest clusters — dense woods ringing the battlefield
+  for (let c = 0; c < 30; c++) {
     const cx = rng.int(8, MAP_SIZE - 9), cy = rng.int(8, MAP_SIZE - 9);
-    for (let i = 0, n = rng.int(5, 12); i < n; i++) {
-      const x = cx + rng.int(-4, 4), y = cy + rng.int(-4, 4);
+    for (let i = 0, n = rng.int(7, 16); i < n; i++) {
+      const x = cx + rng.int(-5, 5), y = cy + rng.int(-5, 5);
       tryAdd(nodes, used, 'tree', x, y);
     }
   }
+  // scattered lone trees fill the gaps
+  for (let i = 0; i < 60; i++) {
+    tryAdd(nodes, used, 'tree', rng.int(6, MAP_SIZE - 7), rng.int(6, MAP_SIZE - 7));
+  }
   // stone deposits
-  for (let c = 0; c < 8; c++) {
+  for (let c = 0; c < 12; c++) {
     const cx = rng.int(8, MAP_SIZE - 9), cy = rng.int(8, MAP_SIZE - 9);
-    for (let i = 0, n = rng.int(3, 6); i < n; i++) {
+    for (let i = 0, n = rng.int(3, 7); i < n; i++) {
       const x = cx + rng.int(-2, 2), y = cy + rng.int(-2, 2);
       tryAdd(nodes, used, 'rock', x, y);
     }

@@ -98,8 +98,6 @@ net.on((msg: ServerMsg) => {
       hud.updateFrame(msg.wave, msg.phase, msg.phaseTicks, msg.resources,
         msg.players, msg.enemies, msg.buildings, castle?.tier ?? 1, selfId);
       hud.handleEvents(msg.events, project);
-      const self = msg.players.find(p => p.id === selfId);
-      if (self) stage.setFollow(self.pos.x, self.pos.y);
       break;
     }
     case 'ping': {
@@ -141,7 +139,14 @@ let last = performance.now();
 function loop(now: number): void {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  if (inGame) {
+    const d = input.dir;
+    world.setSelfDir(d.x, d.y);
+  }
   world.render(dt);
+  // camera follows the predicted self position every display frame (no tick stutter)
+  const selfPos = world.positionOf(selfId);
+  if (selfPos) stage.setFollow(selfPos.x, selfPos.z);
   effects.update(dt);
   env?.update(dt);
   input.updateGhost();

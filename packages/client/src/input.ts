@@ -108,13 +108,19 @@ export class Input {
     return true;
   }
 
-  /** Called at ~20 Hz to push held-input commands. */
-  tick(): void {
+  /** Current normalized-intent move direction (for client-side prediction). */
+  get dir(): { x: number; y: number } {
     let dx = 0, dy = 0;
     if (this.keys.has('w') || this.keys.has('arrowup')) dy -= 1;
     if (this.keys.has('s') || this.keys.has('arrowdown')) dy += 1;
     if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
     if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
+    return { x: dx, y: dy };
+  }
+
+  /** Called at ~20 Hz to push held-input commands. */
+  tick(): void {
+    const { x: dx, y: dy } = this.dir;
     if (dx || dy) this.send({ kind: 'move', dir: { x: dx, y: dy } });
     if (this.mouse.down && !this.buildType) {
       const w = this.stage.screenToWorld(this.mouse.x, this.mouse.y);

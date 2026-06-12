@@ -20,8 +20,12 @@ export class World {
   private tracked = new Map<EntityId, Tracked>();
   private nodes = new Map<EntityId, THREE.Group>();
   private lerpT = 1;
+  private frameInterval = 0.05;   // measured server frame cadence
+  private lastFrameAt = 0;
   private time = 0;
   selfId: EntityId = -1;
+  private selfPredicted: THREE.Vector3 | null = null;
+  private selfDir = { x: 0, y: 0 };
 
   constructor(private scene: THREE.Scene) {}
 
@@ -67,8 +71,18 @@ export class World {
     for (const [id, t] of this.tracked) {
       if (!seen.has(id)) { this.scene.remove(t.obj); this.tracked.delete(id); }
     }
+    // adapt interpolation window to the real frame cadence (EMA, clamped)
+    const now = performance.now() / 1000;
+    if (this.lastFrameAt > 0) {
+      const gap = Math.min(0.15, Math.max(0.03, now - this.lastFrameAt));
+      this.frameInterval = this.frameInterval * 0.8 + gap * 0.2;
+    }
+    this.lastFrameAt = now;
     this.lerpT = 0;
   }
+
+  /** Current movement input of the local player — drives client-side prediction. */
+  setSelfDir(x: number, y: number): void { this.selfDir = { x, y }; }
 
   removeNode(id: EntityId): void {
     const g = this.nodes.get(id);
@@ -139,22 +153,39 @@ export class World {
     if (t && t.attackT <= 0) t.attackT = 1;
   }
 
-  /** dt-based interpolation + procedural animation. */
+  /** dt-based interpolation + prediction + procedural animation. */
   render(dt: number): void {
     this.time += dt;
-    this.lerpT = Math.min(1, this.lerpT + dt / 0.05);
+    this.lerpT = Math.min(1, this.lerpT + dt / this.frameInterval);
 
-    for (const t of this.tracked.values()) {
+    for (const [id, t] of this.tracked) {
       const isBuilding = t.kind.startsWith('building');
-      const prev = t.obj.position.clone();
-      t.obj.position.lerpVectors(t.from, t.to, this.lerpT);
 
+      if (id === this.selfId && t.kind.endsWith(':true')) {
+        // client-side prediction: move instantly at sim speed, blend toward server
+        if (!this.selfPredicted) this.selfPredicted = t.to.clone();
+        const len = Math.hypot(this.selfDir.x, this.selfDir.y);
+        const moving = len > 0.001;
+        if (moving) {
+          this.selfPredicted.x += (this.selfDir.x / len) * 6 * dt;
+          this.selfPredicted.z += (this.selfDir.y / len) * 6 * dt;
+        }
+        // reconcile: gentle pull normally, hard snap if server disagrees a lot
+        const err = this.selfPredicted.distanceTo(t.to);
+        const pull = err > 2 ? 1 : Math.min(1, dt * (moving ? 2.5 : 8));
+        this.selfPredicted.lerp(t.to, pull);
+        t.obj.position.copy(this.selfPredicted);
+        if (moving) t.obj.rotation.y = Math.atan2(this.selfDir.x, this.selfDir.y);
+        this.animateCharacter(t, moving, dt);
+        continue;
+      }
+
+      t.obj.position.lerpVectors(t.from, t.to, this.lerpT);
       if (!isBuilding) {
         const dx = t.to.x - t.from.x, dz = t.to.z - t.from.z;
         const moving = Math.abs(dx) + Math.abs(dz) > 0.004;
         if (moving) t.obj.rotation.y = Math.atan2(dx, dz);
         this.animateCharacter(t, moving, dt);
-        void prev;
       } else {
         this.animateBuilding(t, dt);
       }

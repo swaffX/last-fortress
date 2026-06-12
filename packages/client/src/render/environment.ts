@@ -29,6 +29,7 @@ export class Environment {
     const rng = new Rng((seed ^ 0xdec0de) >>> 0);
     for (const n of nodes) this.occupied.push({ x: n.pos.x, y: n.pos.y, r: 1.5 });
 
+    this.groundPatches(rng);
     this.houses(rng);
     this.ruinedVillage(rng);
     this.cemetery(rng);
@@ -36,6 +37,7 @@ export class Environment {
     this.swamps(rng);
     this.fog(rng);
     this.grassAndFlowers(rng);
+    this.bushesAndProps(rng);
     this.torchPosts();
 
     this.root.traverse(o => {
@@ -235,28 +237,57 @@ export class Environment {
     }
   }
 
+  // ---- big soft color discs break up the flat green ground ----
+  private groundPatches(rng: Rng): void {
+    const palette = [0x4f7340, 0x456a36, 0x55794a, 0x5d8044, 0x6b6a3a];
+    for (let i = 0; i < 70; i++) {
+      const x = 4 + rng.next() * (MAP_SIZE - 8), y = 4 + rng.next() * (MAP_SIZE - 8);
+      const patch = new THREE.Mesh(
+        new THREE.CircleGeometry(2 + rng.next() * 5, 10),
+        new THREE.MeshLambertMaterial({
+          color: rng.pick(palette), transparent: true, opacity: 0.5, depthWrite: false,
+        }));
+      patch.rotation.x = -Math.PI / 2;
+      patch.position.set(x, 0.012 + i * 0.0004, y);
+      patch.receiveShadow = true;
+      this.root.add(patch);
+    }
+    // worn dirt ring around the castle clearing
+    const dirt = new THREE.Mesh(
+      new THREE.RingGeometry(4.6, 7.2, 24),
+      new THREE.MeshLambertMaterial({ color: 0x7a6647, transparent: true, opacity: 0.55, depthWrite: false }));
+    dirt.rotation.x = -Math.PI / 2;
+    dirt.position.set(CX, 0.04, CY);
+    this.root.add(dirt);
+  }
+
   // ---- instanced grass tufts + flowers: cheap ground cover ----
   private grassAndFlowers(rng: Rng): void {
-    const grassGeo = new THREE.ConeGeometry(0.05, 0.28, 4);
-    const grass = new THREE.InstancedMesh(grassGeo, mat(0x57883f), 320);
-    const m4 = new THREE.Matrix4();
-    let placed = 0;
-    for (let i = 0; i < 800 && placed < 320; i++) {
-      const x = 6 + rng.next() * (MAP_SIZE - 12), y = 6 + rng.next() * (MAP_SIZE - 12);
-      if (Math.hypot(x - CX, y - CY) < 8) continue;
-      m4.makeRotationY(rng.next() * Math.PI);
-      m4.setPosition(x, 0.14, y);
-      grass.setMatrixAt(placed++, m4);
+    const grassGeo = new THREE.ConeGeometry(0.06, 0.3, 4);
+    for (const [color, total] of [[0x57883f, 900], [0x6a9a4a, 500]] as const) {
+      const grass = new THREE.InstancedMesh(grassGeo, mat(color), total);
+      const m4 = new THREE.Matrix4();
+      let placed = 0;
+      for (let i = 0; i < total * 3 && placed < total; i++) {
+        const x = 5 + rng.next() * (MAP_SIZE - 10), y = 5 + rng.next() * (MAP_SIZE - 10);
+        if (Math.hypot(x - CX, y - CY) < 8) continue;
+        m4.makeRotationY(rng.next() * Math.PI);
+        const s = 0.7 + rng.next() * 0.9;
+        m4.scale(new THREE.Vector3(s, s, s));
+        m4.setPosition(x, 0.15 * s, y);
+        grass.setMatrixAt(placed++, m4);
+      }
+      grass.count = placed;
+      this.root.add(grass);
     }
-    grass.count = placed;
-    this.root.add(grass);
 
+    const m4 = new THREE.Matrix4();
     const flowerGeo = new THREE.SphereGeometry(0.06, 5, 4);
-    const colors = [0xd86a8a, 0xe8b64c, 0xc8d8e8];
+    const colors = [0xd86a8a, 0xe8b64c, 0xc8d8e8, 0xb86fd8];
     for (const color of colors) {
-      const flowers = new THREE.InstancedMesh(flowerGeo, mat(color), 40);
+      const flowers = new THREE.InstancedMesh(flowerGeo, mat(color), 90);
       let fp = 0;
-      for (let i = 0; i < 120 && fp < 40; i++) {
+      for (let i = 0; i < 270 && fp < 90; i++) {
         const x = 8 + rng.next() * (MAP_SIZE - 16), y = 8 + rng.next() * (MAP_SIZE - 16);
         if (Math.hypot(x - CX, y - CY) < 10) continue;
         m4.identity();
@@ -265,6 +296,65 @@ export class Environment {
       }
       flowers.count = fp;
       this.root.add(flowers);
+    }
+  }
+
+  // ---- bushes, stumps, pebbles, fallen logs scattered everywhere ----
+  private bushesAndProps(rng: Rng): void {
+    const m4 = new THREE.Matrix4();
+    // bushes — instanced squashed icospheres, two greens
+    const bushGeo = new THREE.IcosahedronGeometry(0.45, 0);
+    for (const [color, total] of [[0x3f7a33, 120], [0x4a8a3d, 80]] as const) {
+      const bushes = new THREE.InstancedMesh(bushGeo, mat(color), total);
+      bushes.castShadow = true;
+      let placed = 0;
+      for (let i = 0; i < total * 3 && placed < total; i++) {
+        const x = 5 + rng.next() * (MAP_SIZE - 10), y = 5 + rng.next() * (MAP_SIZE - 10);
+        if (Math.hypot(x - CX, y - CY) < 9) continue;
+        if (this.occupied.some(o => Math.hypot(o.x - x, o.y - y) < 1.2)) continue;
+        const s = 0.5 + rng.next() * 0.8;
+        m4.makeRotationY(rng.next() * Math.PI);
+        m4.scale(new THREE.Vector3(s, s * 0.65, s));
+        m4.setPosition(x, 0.22 * s, y);
+        bushes.setMatrixAt(placed++, m4);
+      }
+      bushes.count = placed;
+      this.root.add(bushes);
+    }
+    // pebbles
+    const pebbleGeo = new THREE.DodecahedronGeometry(0.12, 0);
+    const pebbles = new THREE.InstancedMesh(pebbleGeo, mat(0x7d8087), 220);
+    let pp = 0;
+    for (let i = 0; i < 660 && pp < 220; i++) {
+      const x = 4 + rng.next() * (MAP_SIZE - 8), y = 4 + rng.next() * (MAP_SIZE - 8);
+      if (Math.hypot(x - CX, y - CY) < 7) continue;
+      const s = 0.5 + rng.next();
+      m4.makeRotationY(rng.next() * Math.PI);
+      m4.scale(new THREE.Vector3(s, s * 0.7, s));
+      m4.setPosition(x, 0.06 * s, y);
+      pebbles.setMatrixAt(pp++, m4);
+    }
+    pebbles.count = pp;
+    this.root.add(pebbles);
+    // tree stumps
+    for (let i = 0; i < 26; i++) {
+      const p = this.spot(rng, 14, 58, 1.2);
+      if (!p) continue;
+      const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.3, 7), mat(0x6b4a2a));
+      stump.position.set(p.x, 0.15, p.y);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.03, 7), mat(0xa3845c));
+      top.position.set(p.x, 0.31, p.y);
+      this.root.add(stump, top);
+    }
+    // fallen logs
+    for (let i = 0; i < 14; i++) {
+      const p = this.spot(rng, 16, 58, 1.6);
+      if (!p) continue;
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 1.6 + rng.next(), 6), mat(0x5e4023));
+      log.rotation.z = Math.PI / 2;
+      log.rotation.y = rng.next() * Math.PI;
+      log.position.set(p.x, 0.17, p.y);
+      this.root.add(log);
     }
   }
 
