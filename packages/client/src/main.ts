@@ -56,12 +56,13 @@ world.onBuildingHit = (x, z) => effects.gatherHit(x, z, 'stone');   // dust puff
 let prevCombatLevel = 0;
 let prevTools = { axe: 1, pick: 1 };
 input.onSelectAt = cell => {
+  // exact footprint match — assuming 2x2 for walls made a selected wall
+  // swallow clicks meant for its neighbour
   const b = lastFrameBuildings.find(bb => {
-    const s = bb.type === 'castle' ? 4 : 2;
+    const s = BUILDINGS[bb.type].size;
     return cell.x >= bb.pos.x && cell.x < bb.pos.x + s &&
            cell.y >= bb.pos.y && cell.y < bb.pos.y + s;
-  }) ?? lastFrameBuildings.find(bb =>
-    cell.x === bb.pos.x && cell.y === bb.pos.y);
+  });
   hud.selectBuilding(b ?? null);
 };
 
