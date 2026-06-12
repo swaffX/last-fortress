@@ -88,6 +88,7 @@ export type Command =
 export type SimEvent =
   | { kind: 'projectile'; from: Vec2; to: Vec2; weapon: 'arrow' | 'bolt' | 'bomb' | 'ice' | 'lightning' | 'spit' }
   | { kind: 'damage'; pos: Vec2; amount: number; crit: boolean }
+  | { kind: 'melee'; pos: Vec2 }
   | { kind: 'explosion'; pos: Vec2; radius: number }
   | { kind: 'chain'; points: Vec2[] }
   | { kind: 'death'; pos: Vec2; enemy: EnemyType }

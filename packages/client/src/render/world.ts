@@ -153,6 +153,17 @@ export class World {
     if (t && t.attackT <= 0) t.attackT = 1;
   }
 
+  /** Swing animation for whichever player stands at a melee-hit position. */
+  lungePlayerAt(x: number, y: number): void {
+    for (const [, t] of this.tracked) {
+      if (!t.kind.startsWith('player:')) continue;
+      if (Math.hypot(t.obj.position.x - x, t.obj.position.z - y) < 1 && t.attackT <= 0) {
+        t.attackT = 1;
+        return;
+      }
+    }
+  }
+
   /** dt-based interpolation + prediction + procedural animation. */
   render(dt: number): void {
     this.time += dt;

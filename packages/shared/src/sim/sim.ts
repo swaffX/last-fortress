@@ -17,7 +17,7 @@ import {
 } from './constants';
 
 const WEAPON_STATS = {
-  sword:    { range: 1.8, dmg: 25, cooldown: 10 },
+  sword:    { range: 2.3, dmg: 25, cooldown: 10 },
   bow:      { range: 8,   dmg: 15, cooldown: 14 },
   crossbow: { range: 10,  dmg: 22, cooldown: 22 },
 } as const;
@@ -352,10 +352,10 @@ export class Sim {
     }
   }
 
+  /** Players auto-attack the nearest enemy in weapon range — no input needed. */
   private stepPlayerCombat(events: SimEvent[]): void {
-    for (const [pid] of this.attackIntent) {
-      const p = this.state.players.get(pid);
-      if (!p || !p.alive || p.attackCooldown > 0) continue;
+    for (const p of this.state.players.values()) {
+      if (!p.alive || p.attackCooldown > 0) continue;
       const w = WEAPON_STATS[p.weapon];
       // class passives: knight +25% melee dmg, hunter +20% ranged range
       let dmg = w.dmg * p.mods.playerDmgMul;
@@ -370,6 +370,8 @@ export class Sim {
       if (p.weapon !== 'sword') {
         events.push({ kind: 'projectile', from: { ...p.pos }, to: { ...target.pos },
                       weapon: p.weapon === 'bow' ? 'arrow' : 'bolt' });
+      } else {
+        events.push({ kind: 'melee', pos: { ...p.pos } });
       }
       this.damageEnemy(target.id, Math.round(dmg), events, crit);
     }

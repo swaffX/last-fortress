@@ -90,6 +90,7 @@ net.on((msg: ServerMsg) => {
       world.applyFrame(msg.players, msg.enemies, msg.buildings);
       for (const e of msg.events) {
         if (e.kind === 'projectile') world.aimTower(e.from, e.to);
+        if (e.kind === 'melee') world.lungePlayerAt(e.pos.x, e.pos.y);
       }
       effects.handle(msg.events);
       audio.handle(msg.events);

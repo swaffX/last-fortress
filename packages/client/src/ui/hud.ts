@@ -62,7 +62,7 @@ export class Hud {
       </div>
       <div class="party-panel" id="party-panel"></div>
       <div class="build-bar" id="build-bar"></div>
-      <div class="hud-hint">WASD move · Click attack · 1-9 build · U upgrade · K skills · Alt+Click ping</div>
+      <div class="hud-hint">WASD move · Auto-attack near enemies · Click trees/rocks to gather · 1-9 build · U upgrade · K skills</div>
       <div class="minimap"><canvas id="minimap" width="164" height="164"></canvas></div>
       <div class="sel-panel hidden" id="sel-panel"></div>
       <div class="dmg-layer" id="dmg-layer"></div>
