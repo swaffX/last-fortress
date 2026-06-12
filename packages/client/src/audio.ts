@@ -33,6 +33,7 @@ export class Audio {
           else if (e.weapon === 'spit') this.sfx('spit', () => this.spit());
           break;
         case 'melee': this.sfx('swing', () => this.swing()); break;
+        case 'splash': this.sfx('splash', () => this.splash()); break;
         case 'explosion': this.sfx('boom', () => this.boom()); break;
         case 'chain': this.sfx('zap', () => this.zap()); break;
         case 'death': this.sfx('growl', () => this.growl()); break;
@@ -119,6 +120,21 @@ export class Audio {
     const o = this.osc('sawtooth', 880, g, 0.15);
     o.frequency.exponentialRampToValueAtTime(140, this.ctx.currentTime + 0.14);
   }
+  /** watery wading slosh: filtered noise sweep + low plop */
+  private splash(): void {
+    if (!this.ctx) return;
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = 600 + Math.random() * 300;
+    f.frequency.exponentialRampToValueAtTime(220, this.ctx.currentTime + 0.22);
+    f.Q.value = 1.2;
+    f.connect(this.env(0.25, 0.08));
+    this.noise(0.25, f);
+    const g = this.env(0.12, 0.05);
+    const o = this.osc('sine', 240, g, 0.12);
+    o.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.11);
+  }
+
   private swing(): void {
     if (!this.ctx) return;
     const g = this.env(0.1, 0.09);

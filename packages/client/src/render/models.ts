@@ -394,71 +394,123 @@ function zombie(color: number, scale: number,
 }
 
 export function playerModel(klass: ClassType): THREE.Group {
-  const armor = klass === 'knight' ? 0x9fb2c8 : 0x5e7a4a;
-  const trim = klass === 'knight' ? GOLD : 0x8a5a2a;
+  const knight = klass === 'knight';
+  const armor = knight ? 0x9fb2c8 : 0x5e7a4a;
+  const armorDark = knight ? 0x6a7d96 : 0x42583a;
+  const trim = knight ? GOLD : 0xb8742a;
+  const capeColor = knight ? CLOTH : 0x3a4d30;
+  const capeInner = knight ? 0x8a3a18 : 0x2a3a24;
 
-  const body = box(0.55, 0.8, 0.38, armor, 0.7);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), mat(0xd8b59a));
-  head.position.y = 1.32;
-  const helm = klass === 'knight'
-    ? cone(0.26, 0.3, trim, 1.62, 4)
-    : cone(0.3, 0.35, 0x4a5d3a, 1.6, 6);
-
-  const legL = box(0.16, 0.5, 0.16, 0x4a4038, -0.24);
-  legL.position.set(-0.18, 0.5, 0);
-  const legR = box(0.16, 0.5, 0.16, 0x4a4038, -0.24);
-  legR.position.set(0.18, 0.5, 0);
-
-  const armL = box(0.14, 0.55, 0.14, armor, -0.22);
-  armL.position.set(-0.36, 1.05, 0);
-  const armR = box(0.14, 0.55, 0.14, armor, -0.22);
-  armR.position.set(0.36, 1.05, 0);
-
-  // weapons attach to the right arm so swings animate them
-  if (klass === 'knight') {
-    const blade = box(0.07, 0.85, 0.07, 0xc9d2da, -0.75);
-    const guard = box(0.22, 0.05, 0.08, trim, -0.4);
-    armR.add(blade, guard);
-    // shield on left arm
-    const shield = box(0.06, 0.5, 0.38, 0x6a7a94, -0.3);
-    shield.position.x = -0.08;
-    const boss = at(new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), mat(trim)), -0.12, -0.3, 0);
-    armL.add(shield, boss);
-  } else {
-    // bow: curved arc from torus segment + string
-    const bow = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.035, 6, 10, Math.PI), mat(TRUNK));
-    bow.rotation.z = Math.PI / 2;
-    bow.position.y = -0.35;
-    const string = box(0.015, 0.78, 0.015, 0xd8d0c0, -0.35);
-    armR.add(bow, string);
-    // quiver on back
-    const quiver = cyl(0.09, 0.09, 0.45, 0x7a3328, 0);
-    quiver.position.set(0.12, 0.95, -0.26);
-    quiver.rotation.z = 0.3;
-    const fletch = at(box(0.06, 0.12, 0.06, 0xd8d0c0), 0.2, 1.2, -0.28);
-    return finishPlayer(body, head, helm, legL, legR, armL, armR, quiver, fletch, klass);
+  // --- torso: chest plate over tunic, belt with buckle, shoulder pauldrons ---
+  const body = box(0.56, 0.82, 0.4, armor, 0.72);
+  body.add(at(box(0.6, 0.34, 0.44, armorDark), 0, 0.05, 0));                  // chest plate band
+  body.add(at(box(0.6, 0.08, 0.44, 0x3a3028), 0, -0.26, 0));                  // belt
+  body.add(at(box(0.12, 0.12, 0.05, trim), 0, -0.26, 0.22));                  // buckle
+  body.add(at(box(0.58, 0.06, 0.42, trim), 0, 0.24, 0));                      // collar trim
+  for (const sx of [-0.34, 0.34]) {                                            // pauldrons
+    const pad = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 5, 0, Math.PI * 2, 0, Math.PI / 2), mat(armorDark));
+    pad.position.set(sx, 0.36, 0);
+    body.add(pad);
+    body.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), mat(trim)), sx, 0.42, 0));
   }
-  return finishPlayer(body, head, helm, legL, legR, armL, armR, null, null, klass);
-}
 
-function finishPlayer(body: THREE.Mesh, head: THREE.Mesh, helm: THREE.Mesh,
-                      legL: THREE.Mesh, legR: THREE.Mesh, armL: THREE.Mesh, armR: THREE.Mesh,
-                      extra1: THREE.Object3D | null, extra2: THREE.Object3D | null,
-                      klass: ClassType): THREE.Group {
-  // cape
-  const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.75),
-    new THREE.MeshLambertMaterial({ color: klass === 'knight' ? CLOTH : 0x3a4d30, side: THREE.DoubleSide }));
-  cape.position.set(0, 0.85, -0.22);
-  cape.rotation.x = 0.15;
-  const parts: THREE.Object3D[] = [body, head, helm, legL, legR, armL, armR, cape];
-  if (extra1) parts.push(extra1);
-  if (extra2) parts.push(extra2);
-  const g = group(...parts);
+  // --- head + helmet ---
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), mat(0xd8b59a));
+  head.position.y = 1.36;
+  let helm: THREE.Mesh;
+  if (knight) {
+    helm = cyl(0.24, 0.26, 0.34, armor, 1.58, 8);                             // full helm
+    helm.add(at(box(0.5, 0.05, 0.05, armorDark), 0, -0.08, 0.18));            // visor slit
+    helm.add(at(box(0.06, 0.06, 0.52, trim), 0, 0.2, 0));                     // crest rail
+    const plume = cone(0.07, 0.42, 0xc43a31, 0, 5);                           // red plume
+    plume.position.set(0, 0.36, -0.12);
+    plume.rotation.x = 0.5;
+    helm.add(plume);
+  } else {
+    helm = cone(0.31, 0.42, 0x4a5d3a, 1.62, 6);                               // hood
+    helm.add(at(box(0.44, 0.1, 0.44, 0x42583a), 0, -0.18, 0));                // hood rim
+    helm.add(at(box(0.1, 0.04, 0.1, trim), 0, 0.18, 0));                      // clasp
+  }
+
+  // --- legs with boots ---
+  const legL = box(0.17, 0.52, 0.17, 0x4a4038, -0.25);
+  legL.position.set(-0.18, 0.52, 0);
+  legL.add(at(box(0.19, 0.14, 0.24, 0x32281e), 0, -0.45, 0.03));              // boot
+  const legR = box(0.17, 0.52, 0.17, 0x4a4038, -0.25);
+  legR.position.set(0.18, 0.52, 0);
+  legR.add(at(box(0.19, 0.14, 0.24, 0x32281e), 0, -0.45, 0.03));
+
+  // --- arms with gauntlets ---
+  const armL = box(0.15, 0.56, 0.15, armor, -0.23);
+  armL.position.set(-0.38, 1.08, 0);
+  armL.add(at(box(0.18, 0.16, 0.18, armorDark), 0, -0.42, 0));                // gauntlet
+  const armR = box(0.15, 0.56, 0.15, armor, -0.23);
+  armR.position.set(0.38, 1.08, 0);
+  armR.add(at(box(0.18, 0.16, 0.18, armorDark), 0, -0.42, 0));
+
+  const extras: THREE.Object3D[] = [];
+  if (knight) {
+    // longsword: tapered blade, glinting edge, crossguard, wrapped grip, pommel
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.95, 0.035), mat(0xd5dde6));
+    blade.position.y = -0.85;
+    blade.add(at(box(0.03, 0.95, 0.04, 0xf2f6fa), 0, 0, 0));                  // edge highlight
+    const tip = cone(0.06, 0.14, 0xd5dde6, -1.38, 4);
+    const guard = box(0.3, 0.05, 0.09, trim, -0.42);
+    const grip = box(0.06, 0.18, 0.06, 0x3a3028, -0.32);
+    const pommel = at(new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), mat(trim)), 0, -0.2, 0);
+    armR.add(blade, tip, guard, grip, pommel);
+    // heater shield: two-tone field + gold boss + trim
+    const shield = box(0.07, 0.62, 0.46, 0x6a7a94, -0.32);
+    shield.position.x = -0.1;
+    shield.add(at(box(0.08, 0.62, 0.16, 0x2e4a78), 0, 0, 0));                 // center stripe
+    shield.add(at(box(0.09, 0.66, 0.5, trim), 0.01, 0, 0));                   // rim (slightly behind)
+    shield.children[1]!.scale.set(0.4, 1, 1);
+    shield.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 5), mat(trim)), -0.06, 0, 0));
+    armL.add(shield);
+  } else {
+    // recurve bow with grip wrap + nocked arrow
+    const bow = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.035, 6, 12, Math.PI), mat(TRUNK));
+    bow.rotation.z = Math.PI / 2;
+    bow.position.y = -0.38;
+    bow.add(at(box(0.06, 0.14, 0.06, 0x3a3028), 0.42, 0, 0));                 // grip wrap (at arc center)
+    const string = box(0.015, 0.82, 0.015, 0xd8d0c0, -0.38);
+    const arrow = box(0.025, 0.025, 0.5, 0x8a6238, -0.38);
+    arrow.position.z = 0.12;
+    arrow.add(at(cone(0.03, 0.08, 0x9aa3ab, 0, 4), 0, 0, 0.28));
+    arrow.children[0]!.rotation.x = Math.PI / 2;
+    armR.add(bow, string, arrow);
+    // quiver with fletched arrows
+    const quiver = cyl(0.09, 0.1, 0.48, 0x7a3328, 0);
+    quiver.position.set(0.14, 0.98, -0.28);
+    quiver.rotation.z = 0.3;
+    quiver.add(at(box(0.04, 0.06, 0.04, trim), 0, 0.1, 0));                   // strap stud
+    extras.push(quiver);
+    for (const [fx, fy] of [[0.18, 1.26], [0.24, 1.22]] as const) {
+      extras.push(at(box(0.05, 0.12, 0.05, 0xd8d0c0), fx, fy, -0.3));
+    }
+  }
+
+  // --- double-layer cape: outer cloth + inner lining, tapered by scale ---
+  const capeOuter = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.88),
+    new THREE.MeshLambertMaterial({ color: capeColor, side: THREE.DoubleSide }));
+  capeOuter.position.set(0, 0.82, -0.24);
+  capeOuter.rotation.x = 0.15;
+  capeOuter.scale.set(1, 1, 1);
+  const capeInnerMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.78),
+    new THREE.MeshLambertMaterial({ color: capeInner, side: THREE.DoubleSide }));
+  capeInnerMesh.position.set(0, 0.8, -0.21);
+  capeInnerMesh.rotation.x = 0.13;
+  // shoulder clasps holding the cape
+  const claspL = at(new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), mat(trim, trim)), -0.22, 1.12, -0.16);
+  const claspR = at(new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), mat(trim, trim)), 0.22, 1.12, -0.16);
+
+  const g = group(body, head, helm, legL, legR, armL, armR,
+                  capeOuter, capeInnerMesh, claspL, claspR, ...extras);
   g.userData.legs = [legL, legR];
   g.userData.arms = [armL, armR];
   g.userData.body = body;
   g.userData.head = head;
-  g.userData.flags = [cape];
+  g.userData.flags = [capeOuter, capeInnerMesh];
   return g;
 }
 

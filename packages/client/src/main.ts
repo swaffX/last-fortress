@@ -73,6 +73,7 @@ net.on((msg: ServerMsg) => {
       inGame = true;
       selfId = msg.selfId;
       world.selfId = msg.selfId;
+      world.setSeed(msg.seed);
       lastNodes = msg.nodes;
       world.setNodes(msg.nodes);
       input.nodes = msg.nodes;

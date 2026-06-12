@@ -11,3 +11,7 @@ export { waveComposition, enemyHpScale, enemyDmgScale } from './sim/data/waves';
 export { SKILLS, applySkills, defaultModifiers, type SkillDef, type SkillModifiers, type SkillBranch } from './sim/data/skills';
 export { serializeState, deserializeState } from './sim/snapshot';
 export { dist, buildingCenter, nearestEnemy } from './sim/combat';
+export {
+  riverParams, riverYAt, inRiver, onBridge,
+  RIVER_WIDTH, BRIDGE_XS, BRIDGE_HALF_WIDTH, type RiverParams,
+} from './sim/river';

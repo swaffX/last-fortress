@@ -78,6 +78,10 @@ export class Effects {
           this.burst(e.pos.x + 0.5, e.pos.y + 0.5, 0xd9b88a, 8, 0.4, 2.5);
           this.shockwave(e.pos.x + 0.5, e.pos.y + 0.5, 1.4, 0xd9b88a);
           break;
+        case 'splash':
+          this.burst(e.pos.x, e.pos.y, 0x9fd4f0, 5, 0.35, 2.2);
+          this.shockwave(e.pos.x, e.pos.y, 0.9, 0x9fd4f0);
+          break;
       }
     }
   }

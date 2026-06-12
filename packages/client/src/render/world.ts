@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUILDINGS, type EntityId } from '@lf/shared';
+import { BUILDINGS, riverParams, inRiver, type EntityId, type RiverParams } from '@lf/shared';
 import type { BuildingView, EnemyView, PlayerView, NodeView } from '../net';
 import { buildingModel, enemyModel, playerModel, treeModel, rockModel } from './models';
 
@@ -26,6 +26,9 @@ export class World {
   selfId: EntityId = -1;
   private selfPredicted: THREE.Vector3 | null = null;
   private selfDir = { x: 0, y: 0 };
+  private riverP: RiverParams | null = null;
+
+  setSeed(seed: number): void { this.riverP = riverParams(seed); }
 
   constructor(private scene: THREE.Scene) {}
 
@@ -183,8 +186,12 @@ export class World {
         const len = Math.hypot(this.selfDir.x, this.selfDir.y);
         const moving = len > 0.001;
         if (moving) {
-          this.selfPredicted.x += (this.selfDir.x / len) * 6 * dt;
-          this.selfPredicted.z += (this.selfDir.y / len) * 6 * dt;
+          // mirror the sim: wading through the river halves movement speed
+          const wading = this.riverP &&
+            inRiver({ x: this.selfPredicted.x, y: this.selfPredicted.z }, this.riverP);
+          const speed = wading ? 3 : 6;
+          this.selfPredicted.x += (this.selfDir.x / len) * speed * dt;
+          this.selfPredicted.z += (this.selfDir.y / len) * speed * dt;
         }
         // reconcile: gentle pull normally, hard snap if server disagrees a lot
         const err = this.selfPredicted.distanceTo(t.to);

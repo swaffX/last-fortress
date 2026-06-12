@@ -11,6 +11,7 @@ import { waveComposition, enemyHpScale, enemyDmgScale } from './data/waves';
 import { applySkills, defaultModifiers, type SkillModifiers } from './data/skills';
 import { canAfford, charge, refund, scaleCost } from './economy';
 import { dist, buildingCenter, nearestEnemy } from './combat';
+import { riverParams, inRiver, type RiverParams } from './river';
 import {
   MAP_SIZE, CASTLE_POS, DAY_TICKS, PLAYER_SPEED, PLAYER_MAX_HP,
   START_RESOURCES, RESPAWN_TICKS, GATHER_AMOUNT, TICK_RATE,
@@ -27,6 +28,7 @@ export class Sim {
   readonly grid: Grid;
   readonly map: MapData;
   readonly rng: Rng;
+  readonly river: RiverParams;
   private moveIntent = new Map<EntityId, Vec2>();
   private attackIntent = new Map<EntityId, Vec2>();
   private buildQueue: { playerId: EntityId; type: BuildingType; pos: Vec2 }[] = [];
@@ -37,6 +39,7 @@ export class Sim {
     this.rng = new Rng(seed);
     this.grid = new Grid(MAP_SIZE);
     this.map = generateMap(this.rng);
+    this.river = riverParams(seed);
     this.state = {
       tick: 0, phase: 'day', phaseTicks: DAY_TICKS, wave: 0,
       pendingSpawns: [], resources: { ...START_RESOURCES },
@@ -95,7 +98,7 @@ export class Sim {
     this.stepClock(events);
     this.stepBuildCommands(events);
     this.stepIncome();
-    this.stepPlayers();
+    this.stepPlayers(events);
     this.stepGather();
     this.stepTowers(events);
     this.stepPlayerCombat(events);
@@ -424,11 +427,16 @@ export class Sim {
         continue;  // hold position while attacking
       }
 
-      // 3. walk toward the castle
+      // 3. walk toward the castle (rivers slow the horde too — natural moat)
+      const wading = inRiver(e.pos, this.river);
+      const moveSpeed = speed * (wading ? 0.55 : 1);
       const dx = castleCenter.x - e.pos.x, dy = castleCenter.y - e.pos.y;
       const len = Math.hypot(dx, dy) || 1;
-      e.pos.x += (dx / len) * speed;
-      e.pos.y += (dy / len) * speed;
+      e.pos.x += (dx / len) * moveSpeed;
+      e.pos.y += (dy / len) * moveSpeed;
+      if (wading && (this.state.tick + e.id) % 9 === 0) {
+        events.push({ kind: 'splash', pos: { ...e.pos } });
+      }
     }
   }
 
@@ -486,15 +494,20 @@ export class Sim {
     }
   }
 
-  private stepPlayers(): void {
+  private stepPlayers(events: SimEvent[]): void {
     for (const p of this.state.players.values()) {
       if (!p.alive) continue;
       if (p.attackCooldown > 0) p.attackCooldown--;
       const dir = this.moveIntent.get(p.id);
       if (dir) {
+        const wading = inRiver(p.pos, this.river);
+        const speed = PLAYER_SPEED * (wading ? 0.5 : 1);
         const len = Math.hypot(dir.x, dir.y) || 1;
-        p.pos.x = clamp(p.pos.x + (dir.x / len) * PLAYER_SPEED, 0, MAP_SIZE - 1);
-        p.pos.y = clamp(p.pos.y + (dir.y / len) * PLAYER_SPEED, 0, MAP_SIZE - 1);
+        p.pos.x = clamp(p.pos.x + (dir.x / len) * speed, 0, MAP_SIZE - 1);
+        p.pos.y = clamp(p.pos.y + (dir.y / len) * speed, 0, MAP_SIZE - 1);
+        if (wading && (this.state.tick + p.id) % 7 === 0) {
+          events.push({ kind: 'splash', pos: { ...p.pos } });
+        }
       }
     }
     this.moveIntent.clear();

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { Rng, MAP_SIZE, CASTLE_POS } from '@lf/shared';
+import {
+  Rng, MAP_SIZE, CASTLE_POS, riverParams, riverYAt, RIVER_WIDTH, BRIDGE_XS,
+} from '@lf/shared';
 import type { NodeView } from '../net';
 
 /**
@@ -60,7 +62,7 @@ export class Environment {
   private time = 0;
   private occupied: { x: number; y: number; r: number }[] = [];
 
-  constructor(private scene: THREE.Scene, seed: number, nodes: NodeView[]) {
+  constructor(private scene: THREE.Scene, private seed: number, nodes: NodeView[]) {
     const rng = new Rng((seed ^ 0xdec0de) >>> 0);
     for (const n of nodes) this.occupied.push({ x: n.pos.x, y: n.pos.y, r: 1.5 });
 
@@ -120,14 +122,11 @@ export class Environment {
     });
     const bankMat = new THREE.MeshLambertMaterial({ color: 0x8a7350, transparent: true, opacity: 0.7, depthWrite: false });
 
-    // sine path crossing the whole map, offset to one side of the castle
-    const side = rng.next() < 0.5 ? -1 : 1;
-    const offset = side * (24 + rng.next() * 6);
-    const amp = 6 + rng.next() * 5;
-    const freq = 0.05 + rng.next() * 0.03;
-    const phase = rng.next() * Math.PI * 2;
-    const yAt = (x: number) => CY + offset + Math.sin(x * freq + phase) * amp;
-    const W = 3.4;
+    // path comes from the shared module — the sim slows movement on the
+    // exact same channel, so visuals and gameplay can never drift apart
+    const params = riverParams(this.seed);
+    const yAt = (x: number) => riverYAt(x, params);
+    const W = RIVER_WIDTH;
 
     const step = 3;
     for (let x = 2; x < MAP_SIZE - 2; x += step) {
@@ -161,8 +160,8 @@ export class Environment {
       this.occupied.push({ x: cx, y: cy, r: W / 2 + 1.5 });
     }
 
-    // two plank bridges crossing the river
-    for (const bx of [MAP_SIZE * 0.3, MAP_SIZE * 0.68]) {
+    // two plank bridges crossing the river (positions shared with the sim)
+    for (const bx of BRIDGE_XS) {
       const by = yAt(bx);
       const slope = Math.atan2(yAt(bx + 1) - yAt(bx - 1), 2);
       const g = new THREE.Group();
