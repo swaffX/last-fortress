@@ -1,0 +1,254 @@
+import type { WebSocket } from 'ws';
+import {
+  Sim, TICK_MS, BUILDINGS, type ClassType, type EntityId, type SimEvent, type Command,
+} from '@lf/shared';
+import {
+  encode, type ServerMsg, type BuildingView, type EnemyView, type PlayerView, type NodeView,
+} from './protocol';
+import type { Profile, ProfileStore } from './db';
+
+const MAX_PLAYERS = 2;
+const RECONNECT_MS = 60_000;
+const MAX_CMDS_PER_TICK = 16;
+
+interface Seat {
+  deviceId: string;
+  profile: Profile;
+  klass: ClassType;
+  ws: WebSocket | null;          // null while disconnected (reconnect window)
+  playerId: EntityId | null;     // assigned at game start
+  disconnectedAt: number | null;
+  cmdCount: number;              // rate limit, reset each tick
+  kills: number;
+}
+
+export class Room {
+  readonly code: string;
+  private seats: Seat[] = [];
+  private sim: Sim | null = null;
+  private seed = (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
+  private timer: NodeJS.Timeout | null = null;
+  private state: 'lobby' | 'playing' | 'over' = 'lobby';
+  readonly solo: boolean;
+
+  constructor(code: string, solo: boolean, private store: ProfileStore,
+              private onEmpty: (code: string) => void) {
+    this.code = code;
+    this.solo = solo;
+  }
+
+  get isFull(): boolean { return this.seats.filter(s => s.ws || this.inWindow(s)).length >= MAX_PLAYERS; }
+  get isJoinable(): boolean { return this.state === 'lobby' && !this.solo && !this.isFull; }
+  hasDevice(deviceId: string): boolean { return this.seats.some(s => s.deviceId === deviceId); }
+
+  private inWindow(s: Seat): boolean {
+    return s.disconnectedAt !== null && Date.now() - s.disconnectedAt < RECONNECT_MS;
+  }
+
+  addPlayer(ws: WebSocket, profile: Profile, klass: ClassType): void {
+    // reconnect: same device returning?
+    const existing = this.seats.find(s => s.deviceId === profile.deviceId);
+    if (existing) {
+      existing.ws = ws;
+      existing.disconnectedAt = null;
+      existing.profile = profile;
+      if (this.state === 'playing' && this.sim && existing.playerId !== null) {
+        this.sendGameStart(existing);
+      } else {
+        this.broadcastLobby();
+      }
+      return;
+    }
+    this.seats.push({
+      deviceId: profile.deviceId, profile, klass, ws,
+      playerId: null, disconnectedAt: null, cmdCount: 0, kills: 0,
+    });
+    this.broadcastLobby();
+  }
+
+  handleDisconnect(ws: WebSocket): void {
+    const seat = this.seats.find(s => s.ws === ws);
+    if (!seat) return;
+    seat.ws = null;
+    seat.disconnectedAt = Date.now();
+    if (this.state === 'lobby') {
+      this.seats = this.seats.filter(s => s !== seat);
+      this.broadcastLobby();
+    }
+    this.checkEmpty();
+  }
+
+  handleLeave(ws: WebSocket): void {
+    const seat = this.seats.find(s => s.ws === ws);
+    if (!seat) return;
+    if (this.sim && seat.playerId !== null) this.sim.removePlayer(seat.playerId);
+    this.seats = this.seats.filter(s => s !== seat);
+    if (this.state === 'lobby') this.broadcastLobby();
+    this.checkEmpty();
+  }
+
+  handleStart(ws: WebSocket): void {
+    if (this.state !== 'lobby') return;
+    if (this.seats.length === 0 || this.seats[0]!.ws !== ws) return;  // host only
+    this.state = 'playing';
+    this.sim = new Sim(this.seed);
+    for (const seat of this.seats) {
+      const p = this.sim.addPlayer(seat.klass, seat.profile.unlockedSkills);
+      seat.playerId = p.id;
+    }
+    for (const seat of this.seats) this.sendGameStart(seat);
+    this.timer = setInterval(() => this.tick(), TICK_MS);
+  }
+
+  handleCommand(ws: WebSocket, cmd: Command): void {
+    if (this.state !== 'playing' || !this.sim) return;
+    const seat = this.seats.find(s => s.ws === ws);
+    if (!seat || seat.playerId === null) return;
+    if (++seat.cmdCount > MAX_CMDS_PER_TICK) return;            // rate limit: silent drop
+    if (!validCommand(cmd)) { console.warn(`[room ${this.code}] invalid cmd dropped`); return; }
+    this.sim.applyCommand(seat.playerId, cmd);
+  }
+
+  handlePing(ws: WebSocket, pos: { x: number; y: number }): void {
+    const seat = this.seats.find(s => s.ws === ws);
+    if (!seat) return;
+    this.broadcast({ t: 'ping', pos, from: seat.profile.name });
+  }
+
+  private tick(): void {
+    if (!this.sim) return;
+    const events = this.sim.step();
+    this.trackKills(events);
+    this.broadcast(this.buildFrame(events));
+    for (const s of this.seats) s.cmdCount = 0;
+
+    if (this.sim.state.gameOver) void this.finish();
+    // expire reconnect windows
+    const before = this.seats.length;
+    this.seats = this.seats.filter(s => s.ws !== null || this.inWindow(s));
+    if (this.seats.length !== before) this.checkEmpty();
+  }
+
+  private trackKills(events: SimEvent[]): void {
+    // Phase 1: kills credited to the team; split evenly on save.
+    const deaths = events.filter(e => e.kind === 'death').length;
+    if (deaths === 0 || this.seats.length === 0) return;
+    for (const s of this.seats) s.kills += deaths / this.seats.length;
+  }
+
+  private async finish(): Promise<void> {
+    if (this.state === 'over' || !this.sim) return;
+    this.state = 'over';
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    const wave = this.sim.state.wave;
+    const coins = this.sim.state.resources.coins;
+    const skillPointsEarned = Math.max(1, Math.floor(wave / 2));
+    for (const seat of this.seats) {
+      seat.profile.gamesPlayed++;
+      seat.profile.totalKills += Math.round(seat.kills);
+      seat.profile.bestWave = Math.max(seat.profile.bestWave, wave);
+      seat.profile.skillPoints += skillPointsEarned;
+      await this.store.save(seat.profile);
+      this.send(seat, { t: 'game_over', wave, coinsEarned: coins, skillPointsEarned });
+      this.send(seat, { t: 'profile', profile: seat.profile });
+    }
+  }
+
+  destroy(): void {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+  }
+
+  private checkEmpty(): void {
+    const active = this.seats.some(s => s.ws !== null || this.inWindow(s));
+    if (!active) {
+      this.destroy();
+      this.onEmpty(this.code);
+    }
+  }
+
+  // ---- views & messaging ----
+
+  private buildFrame(events: SimEvent[]): ServerMsg {
+    const s = this.sim!.state;
+    return {
+      t: 'frame',
+      tick: s.tick, phase: s.phase,
+      phaseTicks: s.phase === 'day' ? s.phaseTicks : -1,
+      wave: s.wave, resources: s.resources,
+      players: this.playerViews(), enemies: this.enemyViews(),
+      buildings: this.buildingViews(), events,
+    };
+  }
+
+  private playerViews(): PlayerView[] {
+    const out: PlayerView[] = [];
+    for (const seat of this.seats) {
+      if (seat.playerId === null) continue;
+      const p = this.sim!.state.players.get(seat.playerId);
+      if (!p) continue;
+      out.push({ id: p.id, klass: p.klass, pos: p.pos, hp: p.hp, maxHp: p.maxHp,
+                 alive: p.alive, name: seat.profile.name });
+    }
+    return out;
+  }
+  private enemyViews(): EnemyView[] {
+    return [...this.sim!.state.enemies.values()].map(e => ({
+      id: e.id, type: e.type, pos: e.pos, hp: e.hp, maxHp: e.maxHp,
+      slowed: e.slowTicks > 0, enraged: e.enraged,
+    }));
+  }
+  private buildingViews(): BuildingView[] {
+    return [...this.sim!.state.buildings.values()].map(b => ({
+      id: b.id, type: b.type, tier: b.tier, pos: b.pos, hp: b.hp, maxHp: b.maxHp,
+    }));
+  }
+  private nodeViews(): NodeView[] {
+    return [...this.sim!.state.nodes.values()].map(n => ({
+      id: n.id, kind: n.kind, pos: n.pos, amount: n.amount,
+    }));
+  }
+
+  private sendGameStart(seat: Seat): void {
+    this.send(seat, {
+      t: 'game_start', seed: this.seed, selfId: seat.playerId!,
+      nodes: this.nodeViews(), buildings: this.buildingViews(),
+    });
+  }
+
+  private broadcastLobby(): void {
+    for (const seat of this.seats) {
+      this.send(seat, {
+        t: 'lobby', code: this.code,
+        players: this.seats.map(s => ({ name: s.profile.name, klass: s.klass })),
+        host: this.seats[0] === seat,
+      });
+    }
+  }
+
+  private broadcast(msg: ServerMsg): void {
+    const data = encode(msg);
+    for (const seat of this.seats) {
+      if (seat.ws && seat.ws.readyState === seat.ws.OPEN) seat.ws.send(data);
+    }
+  }
+  private send(seat: Seat, msg: ServerMsg): void {
+    if (seat.ws && seat.ws.readyState === seat.ws.OPEN) seat.ws.send(encode(msg));
+  }
+}
+
+function validCommand(cmd: Command): boolean {
+  switch (cmd.kind) {
+    case 'move': case 'attack':
+      return isFiniteVec(cmd.dir);
+    case 'build':
+      return typeof cmd.type === 'string' && cmd.type in BUILDINGS && isFiniteVec(cmd.pos);
+    case 'upgrade': case 'demolish':
+      return Number.isInteger(cmd.buildingId);
+    default:
+      return false;
+  }
+}
+function isFiniteVec(v: unknown): boolean {
+  return typeof v === 'object' && v !== null &&
+    Number.isFinite((v as { x: unknown }).x) && Number.isFinite((v as { y: unknown }).y);
+}
