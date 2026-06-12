@@ -10,6 +10,7 @@ export { ENEMIES, type EnemyDef } from './sim/data/enemies';
 export { waveComposition, enemyHpScale, enemyDmgScale } from './sim/data/waves';
 export { SKILLS, applySkills, defaultModifiers, type SkillDef, type SkillModifiers, type SkillBranch } from './sim/data/skills';
 export { UPGRADE_CHOICES, type UpgradeDef } from './sim/data/upgrades';
+export { generateDecor, decorBlocks, type Decor, type DecorKind } from './sim/decor';
 export { serializeState, deserializeState } from './sim/snapshot';
 export { dist, buildingCenter, nearestEnemy } from './sim/combat';
 export {

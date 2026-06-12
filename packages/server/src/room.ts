@@ -22,6 +22,7 @@ interface Seat {
   disconnectedAt: number | null;
   cmdCount: number;              // rate limit, reset each tick
   kills: number;
+  lastChat: number;
 }
 
 export class Room {
@@ -67,7 +68,7 @@ export class Room {
     }
     this.seats.push({
       deviceId: profile.deviceId, profile, klass, ws,
-      playerId: null, disconnectedAt: null, cmdCount: 0, kills: 0,
+      playerId: null, disconnectedAt: null, cmdCount: 0, kills: 0, lastChat: 0,
     });
     this.broadcastLobby();
   }
@@ -120,6 +121,28 @@ export class Room {
     const seat = this.seats.find(s => s.ws === ws);
     if (!seat) return;
     this.broadcast({ t: 'ping', pos, from: seat.profile.name });
+  }
+
+  handleChat(ws: WebSocket, text: string): void {
+    const seat = this.seats.find(s => s.ws === ws);
+    if (!seat) return;
+    const clean = text.slice(0, 120).trim();
+    if (!clean) return;
+    const now = Date.now();
+    if (now - seat.lastChat < 400) return;   // rate limit
+    seat.lastChat = now;
+    this.broadcast({ t: 'chat', from: seat.profile.name, text: clean });
+  }
+
+  /** Relay a player's build-cursor ghost to teammates. */
+  handleGhost(ws: WebSocket, type: import('@lf/shared').BuildingType | null,
+              pos: { x: number; y: number }): void {
+    const seat = this.seats.find(s => s.ws === ws);
+    if (!seat) return;
+    const msg = encode({ t: 'ghost', from: seat.profile.name, type, pos });
+    for (const other of this.seats) {
+      if (other !== seat && other.ws && other.ws.readyState === other.ws.OPEN) other.ws.send(msg);
+    }
   }
 
   private tick(): void {

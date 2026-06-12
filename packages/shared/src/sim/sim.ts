@@ -14,6 +14,7 @@ import { dist, buildingCenter, nearestEnemy } from './combat';
 import {
   riverParams, inRiver, inRiverBand, crossesBridgeRail, type RiverParams,
 } from './river';
+import { generateDecor, decorBlocks, type Decor } from './decor';
 import {
   MAP_SIZE, CASTLE_POS, DAY_TICKS, PLAYER_SPEED, PLAYER_MAX_HP,
   START_RESOURCES, RESPAWN_TICKS, GATHER_AMOUNT, TICK_RATE,
@@ -37,6 +38,7 @@ export class Sim {
   readonly map: MapData;
   readonly rng: Rng;
   readonly river: RiverParams;
+  readonly decor: Decor[];
   private moveIntent = new Map<EntityId, Vec2>();
   private gatherIntent = new Set<EntityId>();
   private buildQueue: { playerId: EntityId; type: BuildingType; pos: Vec2 }[] = [];
@@ -48,6 +50,7 @@ export class Sim {
     this.grid = new Grid(MAP_SIZE);
     this.river = riverParams(seed);
     this.map = generateMap(this.rng, this.river);
+    this.decor = generateDecor(seed, this.river, this.map.nodes);
     this.state = {
       tick: 0, phase: 'day', phaseTicks: DAY_TICKS, wave: 0,
       pendingSpawns: [], resources: { ...START_RESOURCES },
@@ -213,6 +216,7 @@ export class Sim {
       const pos = { x: Math.floor(req.pos.x), y: Math.floor(req.pos.y) };
       if (!this.grid.canPlace(pos, def.size)) continue;
       if (this.footprintInRiver(pos, def.size)) continue;   // no construction in the riverbed
+      if (this.footprintOnDecor(pos, def.size)) continue;   // nor inside ruins/houses
       const cost = scaleCost(def.tiers[0]!.cost, team.buildCostMul);
       if (!canAfford(this.state.resources, cost)) continue;
       charge(this.state.resources, cost);
@@ -678,6 +682,13 @@ export class Sim {
     p.pos.y = next.y;
   }
 
+  footprintOnDecor(pos: Vec2, size: number): boolean {
+    for (let y = pos.y; y < pos.y + size; y++)
+      for (let x = pos.x; x < pos.x + size; x++)
+        if (decorBlocks(this.decor, { x: x + 0.5, y: y + 0.5 })) return true;
+    return false;
+  }
+
   footprintInRiver(pos: Vec2, size: number): boolean {
     for (let y = pos.y; y < pos.y + size; y++)
       for (let x = pos.x; x < pos.x + size; x++)
@@ -686,6 +697,7 @@ export class Sim {
   }
 
   isSolidAt(pos: Vec2): boolean {
+    if (decorBlocks(this.decor, pos)) return true;   // houses, towers, the windmill
     const id = this.grid.occupantAt(pos);
     if (id === 0) return false;
     const b = this.state.buildings.get(id);

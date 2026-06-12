@@ -120,6 +120,20 @@ export class Audio {
     const o = this.osc('sawtooth', 880, g, 0.15);
     o.frequency.exponentialRampToValueAtTime(140, this.ctx.currentTime + 0.14);
   }
+  /** soft boot-on-grass thud; quieter for teammates */
+  footstep(self: boolean): void {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    if ((this.lastSfx.get('step') ?? 0) > now - 0.12) return;
+    this.lastSfx.set('step', now);
+    const g = this.env(0.09, self ? 0.05 : 0.025);
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 300 + Math.random() * 200;
+    f.connect(g);
+    this.noise(0.09, f);
+  }
+
   /** watery wading slosh: filtered noise sweep + low plop */
   private splash(): void {
     if (!this.ctx) return;

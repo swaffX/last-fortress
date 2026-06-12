@@ -10,7 +10,7 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "80:8080"
 
   db:
     image: postgres:17-alpine
@@ -27,19 +27,5 @@ services:
       timeout: 3s
       retries: 10
 
-  # TLS reverse proxy — set your domain in Caddyfile, then expose 80/443.
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-    depends_on:
-      - game
-
 volumes:
   pgdata:
-  caddy_data:

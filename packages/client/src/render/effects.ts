@@ -20,6 +20,7 @@ export class Effects {
   private beams: Beam[] = [];
   private rings: Ring[] = [];
   private flashes: Flash[] = [];
+  private prints: { mesh: THREE.Mesh; life: number }[] = [];
   private geo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
   private flashGeo = new THREE.SphereGeometry(0.16, 6, 5);
   private ringGeo = new THREE.RingGeometry(0.9, 1, 20);
@@ -31,12 +32,14 @@ export class Effects {
     for (const e of events) {
       switch (e.kind) {
         case 'projectile': {
-          const color = e.weapon === 'ice' ? 0x7cc7e8 : e.weapon === 'bomb' ? 0x2b2b30
-            : e.weapon === 'bolt' ? 0xc9d2da : e.weapon === 'spit' ? 0x8fdc4a : 0xd9b88a;
-          this.tracer(e.from.x, e.from.y, e.to.x, e.to.y, color);
-          // muzzle flash at origin, impact burst at target
-          if (e.weapon !== 'spit') this.flash(e.from.x, 1.6, e.from.y, 0xffd9a0);
-          this.burst(e.to.x, e.to.y, color, e.weapon === 'spit' ? 5 : 3, 0.25, 1.8);
+          // arrows/bolts/spit/bombs fly as real entities now — no instant beam.
+          // Only the ice tower keeps its frost-ray visual.
+          if (e.weapon === 'ice') {
+            this.tracer(e.from.x, e.from.y, e.to.x, e.to.y, 0x7cc7e8);
+            this.burst(e.to.x, e.to.y, 0x7cc7e8, 4, 0.3, 2);
+          } else if (e.weapon !== 'spit') {
+            this.flash(e.from.x, 1.6, e.from.y, 0xffd9a0);   // muzzle flash only
+          }
           break;
         }
         case 'explosion':
@@ -112,6 +115,34 @@ export class Effects {
     }
   }
 
+  /** Soft dust puff kicked up behind a moving character (wind trail). */
+  trail(x: number, z: number): void {
+    const p = this.spawn(x + (Math.random() - 0.5) * 0.3, z + (Math.random() - 0.5) * 0.3, 0xcfd8cf);
+    p.mesh.position.y = 0.15;
+    p.vel.set((Math.random() - 0.5) * 0.6, 0.5 + Math.random() * 0.5, (Math.random() - 0.5) * 0.6);
+    p.life = p.maxLife = 0.5 + Math.random() * 0.3;
+    p.gravity = -0.4;   // drifts up like stirred dust
+    (p.mesh.material as THREE.MeshBasicMaterial).opacity = 0.35;
+  }
+
+  /** Fading boot print decal, alternating left/right of the heading. */
+  footprint(x: number, z: number, heading: number, side: -1 | 1): void {
+    const print = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.1, 0.22),
+      new THREE.MeshBasicMaterial({ color: 0x2c2419, transparent: true, opacity: 0.32, depthWrite: false }));
+    print.rotation.x = -Math.PI / 2;
+    print.rotation.z = -heading;
+    const ox = Math.cos(heading) * 0.14 * side, oz = -Math.sin(heading) * 0.14 * side;
+    print.position.set(x + ox, 0.022, z + oz);
+    this.scene.add(print);
+    this.prints.push({ mesh: print, life: 5 });
+    if (this.prints.length > 64) {
+      const old = this.prints.shift()!;
+      this.scene.remove(old.mesh);
+      (old.mesh.material as THREE.Material).dispose();
+    }
+  }
+
   /** expanding fading ring on the ground */
   private shockwave(x: number, z: number, maxScale: number, color: number): void {
     const mesh = new THREE.Mesh(this.ringGeo,
@@ -161,6 +192,17 @@ export class Effects {
 
   update(dt: number): void {
     this.bloodBudget = Math.min(6, this.bloodBudget + dt * 20);
+    for (let i = this.prints.length - 1; i >= 0; i--) {
+      const fp = this.prints[i]!;
+      fp.life -= dt;
+      if (fp.life <= 0) {
+        this.scene.remove(fp.mesh);
+        (fp.mesh.material as THREE.Material).dispose();
+        this.prints.splice(i, 1);
+      } else if (fp.life < 1.5) {
+        (fp.mesh.material as THREE.MeshBasicMaterial).opacity = 0.32 * (fp.life / 1.5);
+      }
+    }
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const r = this.rings[i]!;
       r.life -= dt;

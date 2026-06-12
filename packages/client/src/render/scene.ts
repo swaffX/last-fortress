@@ -155,6 +155,12 @@ export class Stage {
   }
 
   setFollow(x: number, y: number): void { this.follow.set(x, 0, y); }
+
+  /** Wheel zoom: closer down to 14 world units, never wider than the default 26. */
+  zoomBy(delta: number): void {
+    this.viewSize = Math.min(26, Math.max(14, this.viewSize + delta));
+    this.resize();
+  }
   addShake(amount: number): void { this.shake = Math.min(1.2, this.shake + amount); }
   setNight(night: boolean): void { this.nightTarget = night ? 1 : 0; }
 

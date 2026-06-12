@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
-  BUILDINGS, MAP_SIZE, inRiverBand, type BuildingType, type Command, type RiverParams,
+  BUILDINGS, MAP_SIZE, inRiverBand, decorBlocks,
+  type BuildingType, type Command, type RiverParams, type Decor,
 } from '@lf/shared';
 import type { Stage } from './render/scene';
 import type { BuildingView, NodeView } from './net';
@@ -19,6 +20,11 @@ export class Input {
   private ghostRot = 0;
   private rectAnchor: { x: number; y: number } | null = null;
   private rectLine: THREE.Line | null = null;
+  private ghostIcon: THREE.Sprite | null = null;
+  private ghostIconOk: boolean | null = null;
+  /** last hovered cell while in build mode — shared with teammates */
+  ghostCell: { x: number; y: number } | null = null;
+  get activeType(): BuildingType | null { return this.buildType; }
 
   send: (cmd: Command) => void = () => {};
   ping: (pos: { x: number; y: number }) => void = () => {};
@@ -29,6 +35,7 @@ export class Input {
   buildings: BuildingView[] = [];
   nodes: NodeView[] = [];
   riverP: RiverParams | null = null;
+  decor: Decor[] = [];
 
   constructor(private stage: Stage, private canvas: HTMLCanvasElement) {
     addEventListener('keydown', e => {
@@ -151,6 +158,11 @@ export class Input {
     this.ghostPlate.position.y = 0.04;
     const g = new THREE.Group();
     g.add(model, this.ghostPlate);
+    // floating ✓ / ✗ marker above the preview
+    this.ghostIcon = makeGhostIcon();
+    this.ghostIcon.position.y = 2.6;
+    this.ghostIconOk = null;
+    g.add(this.ghostIcon);
     this.ghost = g;
     this.stage.scene.add(g);
   }
@@ -178,6 +190,7 @@ export class Input {
         if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return false;
         if (this.buildingAt({ x, y })) return false;
         if (this.riverP && inRiverBand(x + 0.5, y + 0.5, this.riverP, 0.2)) return false;
+        if (decorBlocks(this.decor, { x: x + 0.5, y: y + 0.5 })) return false;
         for (const n of this.nodes) {
           if (n.pos.x === x && n.pos.y === y) return false;
         }
@@ -220,12 +233,49 @@ export class Input {
     if (this.rectAnchor) this.updateRectLine(this.rectAnchor, cell);
     const size = BUILDINGS[this.buildType].size;
     this.ghost.position.set(cell.x + size / 2, 0, cell.y + size / 2);
+    this.ghostCell = cell;
     const ok = this.isValid(cell, size);
     (this.ghostPlate!.material as THREE.MeshBasicMaterial).color.setHex(ok ? 0x6fbf63 : 0xc43a31);
+    if (this.ghostIcon && ok !== this.ghostIconOk) {
+      this.ghostIconOk = ok;
+      drawGhostIcon(this.ghostIcon, ok);
+    }
   }
 
   consumeKey(key: string): boolean {
     if (this.keys.has(key)) { this.keys.delete(key); return true; }
     return false;
   }
+}
+
+function makeGhostIcon(): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(canvas), depthTest: false,
+  }));
+  sprite.scale.setScalar(0.8);
+  sprite.userData.canvas = canvas;
+  return sprite;
+}
+
+function drawGhostIcon(sprite: THREE.Sprite, ok: boolean): void {
+  const canvas = sprite.userData.canvas as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, 64, 64);
+  ctx.lineWidth = 9;
+  ctx.lineCap = 'round';
+  if (ok) {
+    ctx.strokeStyle = '#6fbf63';
+    ctx.beginPath();
+    ctx.moveTo(14, 34); ctx.lineTo(27, 48); ctx.lineTo(50, 17);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = '#e0473c';
+    ctx.beginPath();
+    ctx.moveTo(17, 17); ctx.lineTo(47, 47);
+    ctx.moveTo(47, 17); ctx.lineTo(17, 47);
+    ctx.stroke();
+  }
+  (sprite.material.map as THREE.CanvasTexture).needsUpdate = true;
 }

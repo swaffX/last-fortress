@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   BUILDINGS, MAP_SIZE, riverParams, inRiver, inRiverBand, onBridge, crossesBridgeRail,
-  type EntityId, type RiverParams,
+  decorBlocks, type EntityId, type RiverParams, type Decor,
 } from '@lf/shared';
 import type { BuildingView, EnemyView, PlayerView, NodeView, ProjectileView } from '../net';
 import {
@@ -21,6 +21,7 @@ interface Tracked {
   heading: number;         // current smoothed facing
   targetHeading: number;   // where the entity wants to face
   turnRate: number;        // smoothed angular velocity — drives banking lean
+  stepSign: number;        // walk-cycle phase sign, flips on each stride
 }
 
 /** shortest-path angular damp: eases rotation instead of snapping */
@@ -45,10 +46,44 @@ export class World {
   private riverP: RiverParams | null = null;
   /** latest frame views — prediction collides against the same world the sim does */
   colliders: { buildings: BuildingView[]; nodes: NodeView[] } = { buildings: [], nodes: [] };
+  decor: Decor[] = [];
 
   setSeed(seed: number): void { this.riverP = riverParams(seed); }
 
+  /** Fired once per stride of any walking player (footprints, dust, sfx). */
+  onStep: (x: number, z: number, heading: number, side: -1 | 1, isSelf: boolean) => void = () => {};
+
+  // ---- teammate's build cursor, rendered as a translucent blue preview ----
+  private remoteGhost: THREE.Group | null = null;
+  private remoteGhostKind: string | null = null;
+
+  setRemoteGhost(type: string | null, pos: { x: number; y: number }): void {
+    if (!type) {
+      if (this.remoteGhost) { this.scene.remove(this.remoteGhost); this.remoteGhost = null; this.remoteGhostKind = null; }
+      return;
+    }
+    if (this.remoteGhostKind !== type) {
+      if (this.remoteGhost) this.scene.remove(this.remoteGhost);
+      const model = buildingModel(type as Parameters<typeof buildingModel>[0], 1);
+      model.traverse(o => {
+        if (o instanceof THREE.Mesh) {
+          const m = (o.material as THREE.MeshLambertMaterial).clone();
+          m.transparent = true; m.opacity = 0.4;
+          m.color.lerp(new THREE.Color(0x6db8d8), 0.5);   // teammate tint
+          o.material = m;
+          o.castShadow = false;
+        }
+      });
+      this.remoteGhost = model;
+      this.remoteGhostKind = type;
+      this.scene.add(model);
+    }
+    const size = BUILDINGS[type as keyof typeof BUILDINGS].size;
+    this.remoteGhost!.position.set(pos.x + size / 2, 0, pos.y + size / 2);
+  }
+
   private isSolidAt(x: number, y: number): boolean {
+    if (decorBlocks(this.decor, { x, y })) return true;
     const cx = Math.floor(x), cy = Math.floor(y);
     for (const b of this.colliders.buildings) {
       if (BUILDINGS[b.type].walkable) continue;
@@ -183,7 +218,7 @@ export class World {
       obj, kind,
       from: new THREE.Vector3(x, 0, y), to: new THREE.Vector3(x, 0, y),
       hpBar, animT: (id % 31) * 0.21, attackT: 0, deadT: 0, recoilT: 0,
-      heading: 0, targetHeading: 0, turnRate: 0,
+      heading: 0, targetHeading: 0, turnRate: 0, stepSign: 1,
     };
     this.tracked.set(id, t);
     return t;
@@ -376,6 +411,14 @@ export class World {
     const head = u.head as THREE.Mesh | undefined;
 
     if (moving) {
+      // stride event when the swing phase flips (player feet hit the ground)
+      const sign = swing >= 0 ? 1 : -1;
+      if (sign !== t.stepSign && !isZombie) {
+        t.stepSign = sign;
+        const id = [...this.tracked.entries()].find(([, v]) => v === t)?.[0];
+        this.onStep(t.obj.position.x, t.obj.position.z, t.heading,
+          sign as -1 | 1, id === this.selfId);
+      }
       legs[0]!.rotation.x = swing * 0.7;
       legs[1]!.rotation.x = -swing * 0.7;
       const armBase = isZombie ? -0.9 : 0;

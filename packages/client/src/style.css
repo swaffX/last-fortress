@@ -316,6 +316,33 @@ button { font-family: inherit; cursor: pointer; }
 .restart-row { display: flex; gap: 14px; }
 .restart-votes { color: var(--gold); font-weight: 700; letter-spacing: 0.1em; }
 
+/* perf counter */
+.perf-panel {
+  position: absolute; top: 14px; right: 14px; padding: 5px 12px;
+  background: rgba(13, 20, 32, 0.82); clip-path: var(--chamfer-sm);
+  border: 1px solid var(--night-3); font-size: 0.72rem; font-weight: 700;
+  font-variant-numeric: tabular-nums; color: var(--steel); pointer-events: none;
+}
+
+/* chat */
+.chat-box {
+  position: absolute; bottom: 14px; left: 14px; width: 290px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.chat-log { display: flex; flex-direction: column; gap: 3px; pointer-events: none; }
+.chat-msg {
+  padding: 4px 10px; background: rgba(13, 20, 32, 0.78); clip-path: var(--chamfer-sm);
+  font-size: 0.8rem; line-height: 1.3; transition: opacity 1.2s ease;
+  animation: notif-in 0.25s ease both; word-break: break-word;
+}
+.chat-msg b { color: var(--ember); margin-right: 4px; }
+.chat-msg.faded { opacity: 0.25; }
+.chat-input {
+  padding: 8px 12px; background: rgba(7, 11, 18, 0.95); color: var(--parchment);
+  border: 1px solid var(--ember); clip-path: var(--chamfer-sm);
+  font-family: var(--font-body); font-size: 0.85rem; outline: none;
+}
+
 /* interaction prompt */
 .interact-prompt {
   position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%);

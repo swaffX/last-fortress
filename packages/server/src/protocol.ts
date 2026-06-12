@@ -14,6 +14,9 @@ export type ClientMsg =
   | { t: 'unlock_skill'; skillId: string }
   | { t: 'vote'; option: number }                                // wave-upgrade vote (0..2)
   | { t: 'restart_vote' }                                        // game-over: try again
+  | { t: 'chat'; text: string }
+  | { t: 'latency'; n: number }                                  // echoed back for RTT
+  | { t: 'ghost'; type: BuildingType | null; pos: Vec2 }         // build cursor shared with team
   | { t: 'leave' };
 
 export interface BuildingView {
@@ -48,6 +51,9 @@ export type ServerMsg =
   | { t: 'game_over'; wave: number; coinsEarned: number; skillPointsEarned: number }
   | { t: 'restart_state'; votes: number; needed: number }
   | { t: 'lobby_closed' }
+  | { t: 'chat'; from: string; text: string }
+  | { t: 'latency'; n: number }
+  | { t: 'ghost'; from: string; type: BuildingType | null; pos: Vec2 }
   | { t: 'error'; message: string };
 
 export interface ProfileView {

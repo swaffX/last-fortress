@@ -70,6 +70,11 @@ export class Hud {
       <div class="minimap"><canvas id="minimap" width="164" height="164"></canvas></div>
       <div class="sel-panel hidden" id="sel-panel"></div>
       <div class="interact-prompt hidden" id="interact-prompt"></div>
+      <div class="perf-panel" id="perf-panel"><span id="perf-fps">0</span> FPS · <span id="perf-ping">—</span> ms</div>
+      <div class="chat-box" id="chat-box">
+        <div class="chat-log" id="chat-log"></div>
+        <input class="chat-input hidden" id="chat-input" maxlength="120" placeholder="Press Enter to chat…">
+      </div>
       <div class="choice-overlay hidden" id="choice-overlay"></div>
       <div class="dmg-layer" id="dmg-layer"></div>
       <div class="notif-stack" id="notif-stack"></div>
@@ -306,6 +311,42 @@ export class Hud {
     if (layer.childElementCount > 80) {
       while (layer.childElementCount > 60) layer.firstElementChild!.remove();
     }
+  }
+
+  setPerf(fps: number, ping: number | null): void {
+    this.q('#perf-fps').textContent = String(fps);
+    this.q('#perf-ping').textContent = ping === null ? '—' : String(ping);
+  }
+
+  // ---- chat ----
+  onChat: (text: string) => void = () => {};
+
+  addChat(from: string, text: string): void {
+    const log = this.q('#chat-log');
+    const el = document.createElement('div');
+    el.className = 'chat-msg';
+    el.innerHTML = `<b>${esc(from)}</b> ${esc(text)}`;
+    log.appendChild(el);
+    while (log.childElementCount > 7) log.firstElementChild!.remove();
+    setTimeout(() => { el.classList.add('faded'); }, 9000);
+  }
+
+  get chatOpen(): boolean { return !this.q('#chat-input').classList.contains('hidden'); }
+
+  openChat(): void {
+    const input = this.q('#chat-input') as HTMLInputElement;
+    input.classList.remove('hidden');
+    input.focus();
+  }
+
+  /** Closes the chat input; returns the typed text (empty = cancelled). */
+  closeChat(send: boolean): void {
+    const input = this.q('#chat-input') as HTMLInputElement;
+    const text = input.value.trim();
+    input.value = '';
+    input.classList.add('hidden');
+    input.blur();
+    if (send && text) this.onChat(text);
   }
 
   /** Contextual interaction prompt, e.g. "[E] Gather wood". */

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   Rng, MAP_SIZE, CASTLE_POS, riverParams, riverYAt, inRiverBand,
-  RIVER_WIDTH, BRIDGE_XS, type RiverParams,
+  RIVER_WIDTH, BRIDGE_XS, generateDecor, type RiverParams, type Decor,
 } from '@lf/shared';
 import type { NodeView } from '../net';
 
@@ -74,19 +74,27 @@ export class Environment {
     this.riverPar = riverParams(seed);
     for (const n of nodes) this.occupied.push({ x: n.pos.x, y: n.pos.y, r: 1.5 });
 
+    // solid decorations come from the shared list — same circles the sim collides with
+    const decor = generateDecor(seed, this.riverPar, nodes.map(n => ({ pos: n.pos })));
+    for (const d of decor) this.occupied.push({ x: d.pos.x, y: d.pos.y, r: Math.max(d.r, 3) });
+
     this.groundPatches(rng);
     this.river(rng);
     this.paths(rng);
     this.campfire();
-    this.houses(rng);
-    this.ruinedVillage(rng);
-    this.cemetery(rng);
-    this.watchtowers(rng);
-    this.swamps(rng);
+    for (const d of decor) {
+      switch (d.kind) {
+        case 'house': this.house(rng, d); break;
+        case 'ruin': this.ruinCluster(rng, d); break;
+        case 'cemetery': this.cemeteryAt(rng, d); break;
+        case 'watchtower': this.watchtowerAt(rng, d); break;
+        case 'windmill': this.windmillAt(d); break;
+        case 'swamp': this.swampAt(rng, d); break;
+      }
+    }
     this.fog(rng);
     this.grassAndFlowers(rng);
     this.bushesAndProps(rng);
-    this.windmill(rng);
     this.firefliesInit(rng);
     this.torchPosts();
 
@@ -336,11 +344,10 @@ export class Environment {
     this.root.add(g);
   }
 
-  // ---- abandoned houses: tilted walls, collapsed roof half ----
-  private houses(rng: Rng): void {
-    for (let i = 0; i < 6; i++) {
-      const p = this.spot(rng, 22, 42, 4);
-      if (!p) continue;
+  // ---- abandoned house: tilted walls, collapsed roof half ----
+  private house(rng: Rng, dec: Decor): void {
+    {
+      const p = dec.pos;
       const g = new THREE.Group();
       const w = 2.4 + rng.next() * 1.2, d = 2 + rng.next();
       const wallH = 1.2;
@@ -382,15 +389,14 @@ export class Environment {
         rail.position.set(-w / 2 + f * 0.6 + 0.3, 0.4, d / 2 + 0.8);
         g.add(post, rail);
       }
-      this.place(g, p.x, p.y, rng.next() * Math.PI * 2);
+      this.place(g, p.x, p.y, dec.rot);
     }
   }
 
-  // ---- ruined village: clusters of broken wall stubs ----
-  private ruinedVillage(rng: Rng): void {
-    for (let c = 0; c < 2; c++) {
-      const center = this.spot(rng, 30, 48, 6);
-      if (!center) continue;
+  // ---- ruined village: cluster of broken wall stubs ----
+  private ruinCluster(rng: Rng, dec: Decor): void {
+    {
+      const center = dec.pos;
       for (let i = 0; i < 5 + rng.int(0, 3); i++) {
         const g = new THREE.Group();
         const stub = new THREE.Mesh(
@@ -407,10 +413,9 @@ export class Environment {
   }
 
   // ---- cemetery: gravestones, crosses, a dead tree ----
-  private cemetery(rng: Rng): void {
-    for (let c = 0; c < 2; c++) {
-      const center = this.spot(rng, 34, 52, 6);
-      if (!center) continue;
+  private cemeteryAt(rng: Rng, dec: Decor): void {
+    {
+      const center = dec.pos;
       const g = new THREE.Group();
       for (let i = 0; i < 7 + rng.int(0, 4); i++) {
         const x = (rng.next() - 0.5) * 7, z = (rng.next() - 0.5) * 7;
@@ -441,15 +446,14 @@ export class Environment {
       const b2 = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 0.7, 4), mat(DEADWOOD));
       b2.position.set(-0.25, 1.3, 0.1); b2.rotation.z = 0.8;
       g.add(trunk, b1, b2);
-      this.place(g, center.x, center.y, rng.next() * Math.PI * 2);
+      this.place(g, center.x, center.y, dec.rot);
     }
   }
 
-  // ---- ruined watchtowers: broken cylinder with jagged top ----
-  private watchtowers(rng: Rng): void {
-    for (let i = 0; i < 3; i++) {
-      const p = this.spot(rng, 26, 50, 4);
-      if (!p) continue;
+  // ---- ruined watchtower: broken cylinder with jagged top ----
+  private watchtowerAt(rng: Rng, dec: Decor): void {
+    {
+      const p = dec.pos;
       const g = new THREE.Group();
       const h = 2 + rng.next() * 1.5;
       const towerBody = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, h, 8), mat(STONE));
@@ -470,15 +474,14 @@ export class Environment {
         fb.position.set((rng.next() - 0.5) * 3.5, 0.15, (rng.next() - 0.5) * 3.5);
         g.add(fb);
       }
-      this.place(g, p.x, p.y, rng.next() * Math.PI * 2);
+      this.place(g, p.x, p.y, dec.rot);
     }
   }
 
-  // ---- swamp patches: dark discs + bubbles + reeds ----
-  private swamps(rng: Rng): void {
-    for (let i = 0; i < 3; i++) {
-      const p = this.spot(rng, 44, 56, 6);
-      if (!p) continue;
+  // ---- swamp patch: dark disc + bubbles + reeds ----
+  private swampAt(rng: Rng, dec: Decor): void {
+    {
+      const p = dec.pos;
       const g = new THREE.Group();
       const r = 3 + rng.next() * 2.5;
       const pool = new THREE.Mesh(new THREE.CircleGeometry(r, 16),
@@ -643,9 +646,8 @@ export class Environment {
   }
 
   // ---- ruined windmill landmark with slowly turning sails ----
-  private windmill(rng: Rng): void {
-    const p = this.spot(rng, 30, 50, 6);
-    if (!p) return;
+  private windmillAt(dec: Decor): void {
+    const p = dec.pos;
     const g = new THREE.Group();
     const towerBody = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.5, 4.2, 8), mat(0x8d9299));
     towerBody.position.y = 2.1;
@@ -673,7 +675,7 @@ export class Environment {
     blades.add(hub);
     g.add(blades);
     this.millBlades = blades;
-    g.rotation.y = rng.next() * Math.PI * 2;
+    g.rotation.y = dec.rot;
     g.position.set(p.x, 0, p.y);
     this.root.add(g);
   }

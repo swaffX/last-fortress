@@ -1,6 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
-import { riverParams } from '@lf/shared';
+import { riverParams, generateDecor } from '@lf/shared';
 import { Net, type ServerMsg, type ProfileView, type BuildingView, type NodeView } from './net';
 import { Stage } from './render/scene';
 import { World } from './render/world';
@@ -80,6 +80,12 @@ net.on((msg: ServerMsg) => {
       world.selfId = msg.selfId;
       world.setSeed(msg.seed);
       input.riverP = riverParams(msg.seed);
+      {
+        const decorList = generateDecor(msg.seed, riverParams(msg.seed),
+          msg.nodes.map(n => ({ pos: n.pos })));
+        world.decor = decorList;
+        input.decor = decorList;
+      }
       hud.hideChoice();
       lastNodes = msg.nodes;
       world.setNodes(msg.nodes);
@@ -123,6 +129,15 @@ net.on((msg: ServerMsg) => {
       hud.notify(`📍 ${msg.from} pinged`);
       break;
     }
+    case 'chat':
+      hud.addChat(msg.from, msg.text);
+      break;
+    case 'latency':
+      lastPing = Math.round(performance.now() - msg.n);
+      break;
+    case 'ghost':
+      world.setRemoteGhost(msg.type, msg.pos);
+      break;
     case 'choice_offer':
       hud.showChoice(msg.options);
       audio.handle([{ kind: 'wave_start', wave: 0, boss: false }]);  // fanfare
@@ -160,11 +175,44 @@ function project(x: number, y: number): { x: number; y: number } | null {
   return { x: (v.x + 1) / 2 * innerWidth, y: (-v.y + 1) / 2 * innerHeight };
 }
 
+// ---- footsteps: prints + dust trail + sfx ----
+world.onStep = (x, z, heading, side, isSelf) => {
+  effects.footprint(x, z, heading, side);
+  effects.trail(x - Math.sin(heading) * 0.3, z - Math.cos(heading) * 0.3);
+  audio.footstep(isSelf);
+};
+hud.onChat = text => net.send({ t: 'chat', text });
+
 // ---- loops ----
 setInterval(() => { if (inGame) input.tick(); }, 50);
 
+// latency probe + teammate ghost sync
+let lastPing: number | null = null;
+setInterval(() => {
+  if (!inGame) return;
+  net.send({ t: 'latency', n: performance.now() });
+}, 2000);
+let lastGhostSent = '';
+setInterval(() => {
+  if (!inGame) return;
+  const type = input.activeType;
+  const cell = input.ghostCell ?? { x: 0, y: 0 };
+  const key = type ? `${type}:${cell.x},${cell.y}` : 'null';
+  if (key === lastGhostSent) return;
+  lastGhostSent = key;
+  net.send({ t: 'ghost', type, pos: cell });
+}, 120);
+
 addEventListener('keydown', e => {
-  if (!inGame || e.target instanceof HTMLInputElement) return;
+  if (!inGame) return;
+  // chat handling first — input field swallows everything else
+  if (hud.chatOpen) {
+    if (e.key === 'Enter') hud.closeChat(true);
+    if (e.key === 'Escape') hud.closeChat(false);
+    return;
+  }
+  if (e.key === 'Enter') { hud.openChat(); e.preventDefault(); return; }
+  if (e.target instanceof HTMLInputElement) return;
   const n = Number(e.key);
   if (n >= 1 && n <= 9) hud.buildByIndex(n - 1);
   if (e.key.toLowerCase() === 'e') {
@@ -178,10 +226,24 @@ addEventListener('keydown', e => {
   }
 });
 
+canvas.addEventListener('wheel', e => {
+  if (!inGame) return;
+  e.preventDefault();
+  stage.zoomBy(e.deltaY * 0.01);
+}, { passive: false });
+
 let last = performance.now();
+let fpsAccum = 0, fpsCount = 0, fpsTimer = 0;
 function loop(now: number): void {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  // fps counter (1 s window)
+  fpsAccum += dt; fpsCount++;
+  fpsTimer += dt;
+  if (fpsTimer >= 1) {
+    hud.setPerf(Math.round(fpsCount / fpsAccum), lastPing);
+    fpsAccum = 0; fpsCount = 0; fpsTimer = 0;
+  }
   if (inGame) {
     const d = input.dir;
     world.setSelfDir(d.x, d.y);
