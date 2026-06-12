@@ -462,11 +462,39 @@ function finishPlayer(body: THREE.Mesh, head: THREE.Mesh, helm: THREE.Mesh,
   return g;
 }
 
-export function treeModel(): THREE.Group {
-  const crown1 = cone(0.55, 1.1, LEAF, 1.2, 6);
-  const crown2 = cone(0.4, 0.8, 0x4a8a3d, 1.7, 6);
-  const g = group(cyl(0.12, 0.18, 0.7, TRUNK), crown1, crown2);
-  g.userData.sway = [crown1, crown2];
+/**
+ * Three tree species with per-instance hue jitter so forests read as organic.
+ * variant: 0 = pine, 1 = oak (blobby crown), 2 = tall fir.
+ */
+export function treeModel(variant = 0, jitter = 0): THREE.Group {
+  const leafColor = new THREE.Color(LEAF).offsetHSL(jitter * 0.06 - 0.03, jitter * 0.15 - 0.05, jitter * 0.1 - 0.05).getHex();
+  const leafColor2 = new THREE.Color(0x4a8a3d).offsetHSL(jitter * 0.05 - 0.025, 0, jitter * 0.08 - 0.04).getHex();
+  let sway: THREE.Object3D[];
+  let g: THREE.Group;
+  if (variant === 1) {
+    // oak: thick trunk, 3 overlapping leaf blobs
+    const b1 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 0), mat(leafColor));
+    b1.position.set(0, 1.35, 0);
+    const b2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.45, 0), mat(leafColor2));
+    b2.position.set(0.4, 1.15, 0.15);
+    const b3 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 0), mat(leafColor));
+    b3.position.set(-0.35, 1.2, -0.1);
+    g = group(cyl(0.16, 0.24, 1, TRUNK), b1, b2, b3);
+    sway = [b1, b2, b3];
+  } else if (variant === 2) {
+    // tall fir: three stacked slim cones
+    const c1 = cone(0.5, 0.9, leafColor, 1.1, 7);
+    const c2 = cone(0.38, 0.8, leafColor2, 1.7, 7);
+    const c3 = cone(0.25, 0.7, leafColor, 2.25, 7);
+    g = group(cyl(0.1, 0.16, 0.8, TRUNK), c1, c2, c3);
+    sway = [c1, c2, c3];
+  } else {
+    const crown1 = cone(0.55, 1.1, leafColor, 1.2, 6);
+    const crown2 = cone(0.4, 0.8, leafColor2, 1.7, 6);
+    g = group(cyl(0.12, 0.18, 0.7, TRUNK), crown1, crown2);
+    sway = [crown1, crown2];
+  }
+  g.userData.sway = sway;
   return g;
 }
 export function rockModel(): THREE.Group {

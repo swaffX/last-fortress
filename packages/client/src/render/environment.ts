@@ -13,6 +13,38 @@ import type { NodeView } from '../net';
 const mat = (color: number, emissive = 0) =>
   new THREE.MeshLambertMaterial({ color, emissive, emissiveIntensity: emissive ? 0.8 : 0 });
 
+/** Streaky tileable water texture: deep blue base, lighter flow lines, sparkle dots. */
+function makeWaterTexture(): THREE.CanvasTexture {
+  const S = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = S;
+  const ctx = canvas.getContext('2d')!;
+  const grad = ctx.createLinearGradient(0, 0, 0, S);
+  grad.addColorStop(0, '#27506e');
+  grad.addColorStop(0.5, '#1e425e');
+  grad.addColorStop(1, '#27506e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, S, S);
+  // horizontal flow streaks (x-tileable: draw twice, offset by S)
+  for (let i = 0; i < 26; i++) {
+    const y = Math.random() * S, x = Math.random() * S;
+    const w = 18 + Math.random() * 34, a = 0.1 + Math.random() * 0.18;
+    ctx.strokeStyle = `rgba(140,190,220,${a})`;
+    ctx.lineWidth = 1 + Math.random() * 1.4;
+    for (const ox of [0, -S, S]) {
+      ctx.beginPath();
+      ctx.moveTo(x + ox, y);
+      ctx.quadraticCurveTo(x + ox + w / 2, y - 2 + Math.random() * 4, x + ox + w, y);
+      ctx.stroke();
+    }
+  }
+  for (let i = 0; i < 40; i++) {
+    ctx.fillStyle = `rgba(190,225,245,${0.15 + Math.random() * 0.25})`;
+    ctx.fillRect(Math.random() * S, Math.random() * S, 1.5, 1);
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
 const STONE = 0x8d9299, STONE_DARK = 0x5c6168, WOOD_DARK = 0x5e4023;
 const RUIN = 0x6e6f6a, GRAVE = 0x9a9d9f, DEADWOOD = 0x4a3b2c, SWAMP = 0x2c3d2a;
 
@@ -23,6 +55,8 @@ export class Environment {
   private fogPlanes: THREE.Mesh[] = [];
   private flames: THREE.Mesh[] = [];
   private smoke: THREE.Mesh[] = [];
+  private lights: { light: THREE.PointLight; base: number; phase: number }[] = [];
+  private waterTex: THREE.CanvasTexture | null = null;
   private time = 0;
   private occupied: { x: number; y: number; r: number }[] = [];
 
@@ -31,6 +65,7 @@ export class Environment {
     for (const n of nodes) this.occupied.push({ x: n.pos.x, y: n.pos.y, r: 1.5 });
 
     this.groundPatches(rng);
+    this.river(rng);
     this.paths(rng);
     this.campfire();
     this.houses(rng);
@@ -72,6 +107,111 @@ export class Environment {
     g.position.set(x, 0, y);
     g.rotation.y = rotY;
     this.root.add(g);
+  }
+
+  // ---- winding river with banks and two wooden bridges (visual only) ----
+  private river(rng: Rng): void {
+    // animated water texture shared by all segments
+    this.waterTex = makeWaterTexture();
+    this.waterTex.wrapS = this.waterTex.wrapT = THREE.RepeatWrapping;
+    const waterMat = new THREE.MeshLambertMaterial({
+      map: this.waterTex, transparent: true, opacity: 0.92,
+      emissive: 0x1a3a52, emissiveIntensity: 0.25,
+    });
+    const bankMat = new THREE.MeshLambertMaterial({ color: 0x8a7350, transparent: true, opacity: 0.7, depthWrite: false });
+
+    // sine path crossing the whole map, offset to one side of the castle
+    const side = rng.next() < 0.5 ? -1 : 1;
+    const offset = side * (24 + rng.next() * 6);
+    const amp = 6 + rng.next() * 5;
+    const freq = 0.05 + rng.next() * 0.03;
+    const phase = rng.next() * Math.PI * 2;
+    const yAt = (x: number) => CY + offset + Math.sin(x * freq + phase) * amp;
+    const W = 3.4;
+
+    const step = 3;
+    for (let x = 2; x < MAP_SIZE - 2; x += step) {
+      const y0 = yAt(x), y1 = yAt(x + step);
+      const dir = Math.atan2(y1 - y0, step);
+      const len = Math.hypot(step, y1 - y0) + 0.4;
+      const cx = x + step / 2, cy = (y0 + y1) / 2;
+      // banks first (wider, under the water)
+      const bank = new THREE.Mesh(new THREE.PlaneGeometry(len + 0.6, W + 1.6), bankMat);
+      bank.rotation.x = -Math.PI / 2;
+      bank.rotation.z = -dir;
+      bank.position.set(cx, 0.028, cy);
+      // water surface
+      const water = new THREE.Mesh(new THREE.PlaneGeometry(len, W), waterMat);
+      water.rotation.x = -Math.PI / 2;
+      water.rotation.z = -dir;
+      water.position.set(cx, 0.045, cy);
+      this.root.add(bank, water);
+      // reeds and stones along the banks
+      if (rng.next() < 0.5) {
+        const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.5 + rng.next() * 0.3, 4), mat(0x55683a));
+        reed.position.set(cx + (rng.next() - 0.5) * 2, 0.28, cy + (W / 2 + 0.4) * (rng.next() < 0.5 ? 1 : -1));
+        this.root.add(reed);
+      }
+      if (rng.next() < 0.3) {
+        const st = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16 + rng.next() * 0.1), mat(0x7d8087));
+        st.position.set(cx + (rng.next() - 0.5) * 2, 0.1, cy + (W / 2 + 0.3) * (rng.next() < 0.5 ? 1 : -1));
+        this.root.add(st);
+      }
+      // keep decor generators away from the riverbed
+      this.occupied.push({ x: cx, y: cy, r: W / 2 + 1.5 });
+    }
+
+    // two plank bridges crossing the river
+    for (const bx of [MAP_SIZE * 0.3, MAP_SIZE * 0.68]) {
+      const by = yAt(bx);
+      const slope = Math.atan2(yAt(bx + 1) - yAt(bx - 1), 2);
+      const g = new THREE.Group();
+      // deck: slightly arched planks spanning the water
+      const span = W + 2.4;
+      for (let i = 0; i < 9; i++) {
+        const t = i / 8;
+        const plank = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.1, span / 9 + 0.05), mat(0x8a6238));
+        plank.position.set(0, 0.35 + Math.sin(t * Math.PI) * 0.25, -span / 2 + (t * span));
+        plank.rotation.x = -Math.cos(t * Math.PI) * 0.22;
+        g.add(plank);
+      }
+      // rails + posts
+      for (const sx of [-0.8, 0.8]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, span), mat(WOOD_DARK));
+        rail.position.set(sx, 0.95, 0);
+        g.add(rail);
+        for (const pz of [-span / 2 + 0.2, 0, span / 2 - 0.2]) {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.7, 0.1), mat(WOOD_DARK));
+          post.position.set(sx, 0.6, pz);
+          g.add(post);
+        }
+      }
+      // support legs into the water
+      for (const pz of [-W / 2, W / 2]) {
+        for (const sx of [-0.6, 0.6]) {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.6, 5), mat(0x4a3b28));
+          leg.position.set(sx, 0.2, pz);
+          g.add(leg);
+        }
+      }
+      // lanterns at both ends — real warm point lights
+      for (const pz of [-span / 2, span / 2]) {
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.3, 5), mat(WOOD_DARK));
+        pole.position.set(0.8, 0.95, pz);
+        const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 5), mat(0xffd9a0, 0xffb050));
+        lamp.position.set(0.8, 1.65, pz);
+        g.add(pole, lamp);
+        const light = new THREE.PointLight(0xffa94d, 0.9, 7, 1.8);
+        light.position.set(0.8, 1.7, pz);
+        g.add(light);
+        this.lights.push({ light, base: 0.9, phase: Math.random() * 6 });
+      }
+      // bridge sits perpendicular to flow direction
+      g.rotation.y = -slope;
+      g.position.set(bx, 0, by);
+      this.root.add(g);
+      this.occupied.push({ x: bx, y: by, r: 4 });
+    }
   }
 
   // ---- worn dirt paths radiating from the castle gate in 4 directions ----
@@ -128,6 +268,10 @@ export class Environment {
     flame.position.y = 0.35;
     g.add(flame);
     this.flames.push(flame);
+    const fireLight = new THREE.PointLight(0xff8c3b, 1.4, 9, 1.6);
+    fireLight.position.y = 0.8;
+    g.add(fireLight);
+    this.lights.push({ light: fireLight, base: 1.4, phase: 1.3 });
     // smoke puffs — recycled small spheres rising
     for (let i = 0; i < 4; i++) {
       const puff = new THREE.Mesh(new THREE.SphereGeometry(0.12, 5, 4),
@@ -459,6 +603,10 @@ export class Environment {
       const flame = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.3, 5), mat(0xffaa33, 0xff8c3b));
       flame.position.y = 1.85;
       g.add(post, cage, flame);
+      const torchLight = new THREE.PointLight(0xff9540, 1.1, 8, 1.7);
+      torchLight.position.y = 1.9;
+      g.add(torchLight);
+      this.lights.push({ light: torchLight, base: 1.1, phase: i * 1.9 });
       g.position.set(CX + Math.cos(a) * 9, 0, CY + Math.sin(a) * 9);
       this.root.add(g);
       this.flames.push(flame);
@@ -467,6 +615,13 @@ export class Environment {
 
   update(dt: number): void {
     this.time += dt;
+    // flowing water
+    if (this.waterTex) this.waterTex.offset.x = (this.time * 0.06) % 1;
+    // firelight flicker
+    for (const { light, base, phase } of this.lights) {
+      light.intensity = base * (0.85 + Math.sin(this.time * 9 + phase) * 0.1
+                              + Math.sin(this.time * 23 + phase * 2) * 0.05);
+    }
     for (const f of this.fogPlanes) {
       const base = f.userData.basePos as THREE.Vector3;
       const ph = f.userData.phase as number;

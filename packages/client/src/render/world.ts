@@ -33,9 +33,14 @@ export class World {
     for (const g of this.nodes.values()) this.scene.remove(g);
     this.nodes.clear();
     for (const n of nodes) {
-      const g = n.kind === 'tree' ? treeModel() : rockModel();
+      const hash = (n.pos.x * 73856093 ^ n.pos.y * 19349663) >>> 0;
+      const g = n.kind === 'tree'
+        ? treeModel(hash % 3, (hash % 100) / 100)
+        : rockModel();
       g.position.set(n.pos.x + 0.5, 0, n.pos.y + 0.5);
       g.rotation.y = (n.pos.x * 7 + n.pos.y * 13) % 6.28;
+      const s = 0.85 + ((hash >> 4) % 40) / 100;     // 0.85–1.25 size spread
+      g.scale.setScalar(s);
       this.scene.add(g);
       this.nodes.set(n.id, g);
     }
