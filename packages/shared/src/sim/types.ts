@@ -53,6 +53,9 @@ export interface Player {
   alive: boolean;
   respawnTicks: number;
   mods: SkillModifiers;
+  axeTier: number;         // 1..3 — wood yield
+  pickTier: number;        // 1..3 — stone yield
+  gatherCooldown: number;  // separate from combat so E always responds
 }
 
 export interface ResourceNode {

@@ -101,7 +101,7 @@ export class Room {
     this.state = 'playing';
     this.sim = new Sim(this.seed);
     for (const seat of this.seats) {
-      const p = this.sim.addPlayer(seat.klass, seat.profile.unlockedSkills);
+      const p = this.sim.addPlayer(seat.klass, seat.profile.unlockedSkills, seat.profile.tools);
       seat.playerId = p.id;
     }
     for (const seat of this.seats) this.sendGameStart(seat);
@@ -121,6 +121,20 @@ export class Room {
     const seat = this.seats.find(s => s.ws === ws);
     if (!seat) return;
     this.broadcast({ t: 'ping', pos, from: seat.profile.name });
+  }
+
+  /** Tool upgrades are paid from the team coin pool, persist on the profile. */
+  handleToolUpgrade(ws: WebSocket, tool: 'axe' | 'pick'): { profile: Profile } | null {
+    const seat = this.seats.find(s => s.ws === ws);
+    if (!seat || !this.sim || this.state !== 'playing') return null;
+    const tier = seat.profile.tools[tool];
+    const cost = tier === 1 ? 50 : tier === 2 ? 150 : null;
+    if (cost === null || this.sim.state.resources.coins < cost) return null;
+    this.sim.state.resources.coins -= cost;
+    seat.profile.tools[tool] = tier + 1;
+    if (seat.playerId !== null) this.sim.setPlayerTool(seat.playerId, tool, tier + 1);
+    void this.store.save(seat.profile);
+    return { profile: seat.profile };
   }
 
   handleChat(ws: WebSocket, text: string): void {
@@ -217,7 +231,7 @@ export class Room {
     this.sim = new Sim(this.seed);
     for (const seat of this.seats) {
       seat.kills = 0;
-      const p = this.sim.addPlayer(seat.klass, seat.profile.unlockedSkills);
+      const p = this.sim.addPlayer(seat.klass, seat.profile.unlockedSkills, seat.profile.tools);
       seat.playerId = p.id;
     }
     this.state = 'playing';

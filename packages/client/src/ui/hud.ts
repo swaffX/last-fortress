@@ -27,8 +27,11 @@ function costStr(type: BuildingType): string {
   if (c.wood) parts.push(`${c.wood}W`);
   if (c.stone) parts.push(`${c.stone}S`);
   if (c.gold) parts.push(`${c.gold}G`);
+  if (c.coins) parts.push(`${c.coins}C`);
   return parts.join(' ');
 }
+
+const TOOL_UPGRADE_COST: Record<number, number | null> = { 1: 50, 2: 150, 3: null };
 
 export class Hud {
   private root: HTMLElement;
@@ -65,8 +68,22 @@ export class Hud {
         <div class="track"><div class="fill" id="boss-fill" style="width:100%"></div></div>
       </div>
       <div class="party-panel" id="party-panel"></div>
-      <div class="build-bar" id="build-bar"></div>
-      <div class="hud-hint">WASD move · Auto-attack near enemies · Click trees/rocks to gather · 1-9 build · U upgrade · K skills</div>
+      <div class="build-bar" id="inv-bar">
+        <button class="build-slot" id="inv-hammer" title="Build menu (B)">
+          <span class="ico">🔨</span><span class="nm">Build</span><span class="cost">B</span>
+        </button>
+        <button class="build-slot" id="inv-axe">
+          <span class="ico">🪓</span><span class="nm">Axe <b id="axe-tier">I</b></span><span class="cost" id="axe-cost"></span>
+        </button>
+        <button class="build-slot" id="inv-pick">
+          <span class="ico">⛏</span><span class="nm">Pick <b id="pick-tier">I</b></span><span class="cost" id="pick-cost"></span>
+        </button>
+      </div>
+      <div class="build-menu hidden" id="build-menu">
+        <div class="bm-title">Construction</div>
+        <div class="bm-grid" id="bm-grid"></div>
+      </div>
+      <div class="hud-hint">WASD move · Auto-attack · [E] gather near trees/rocks · B build · K skills</div>
       <div class="minimap"><canvas id="minimap" width="164" height="164"></canvas></div>
       <div class="sel-panel hidden" id="sel-panel"></div>
       <div class="interact-prompt hidden" id="interact-prompt"></div>
@@ -80,16 +97,40 @@ export class Hud {
       <div class="notif-stack" id="notif-stack"></div>
       <div id="banner-slot"></div>
     `;
-    const bar = this.q('#build-bar');
+    // central build menu grid
+    const grid = this.q('#bm-grid');
     for (const item of BUILD_ITEMS) {
       const btn = document.createElement('button');
       btn.className = 'build-slot';
       btn.dataset.type = item.type;
       btn.innerHTML = `<span class="ico">${item.ico}</span><span class="nm">${item.name}</span><span class="cost">${costStr(item.type)}</span>`;
-      btn.onclick = () => this.toggleBuild(item.type);
-      bar.appendChild(btn);
+      btn.onclick = () => { this.toggleBuild(item.type); this.toggleBuildMenu(false); };
+      grid.appendChild(btn);
     }
+    (this.q('#inv-hammer')).onclick = () => this.toggleBuildMenu();
+    (this.q('#inv-axe')).onclick = () => this.onToolUpgrade('axe');
+    (this.q('#inv-pick')).onclick = () => this.onToolUpgrade('pick');
     this.mini = (this.q('#minimap') as HTMLCanvasElement).getContext('2d')!;
+  }
+
+  onToolUpgrade: (tool: 'axe' | 'pick') => void = () => {};
+
+  toggleBuildMenu(open?: boolean): void {
+    const el = this.q('#build-menu');
+    const show = open ?? el.classList.contains('hidden');
+    el.classList.toggle('hidden', !show);
+  }
+  get buildMenuOpen(): boolean { return !this.q('#build-menu').classList.contains('hidden'); }
+
+  /** Refresh tool tiers + upgrade costs on the inventory bar. */
+  setTools(tools: { axe: number; pick: number }): void {
+    const roman = ['', 'I', 'II', 'III'];
+    this.q('#axe-tier').textContent = roman[tools.axe] ?? 'III';
+    this.q('#pick-tier').textContent = roman[tools.pick] ?? 'III';
+    const ac = TOOL_UPGRADE_COST[tools.axe];
+    const pc = TOOL_UPGRADE_COST[tools.pick];
+    this.q('#axe-cost').textContent = ac ? `▲ ${ac}C` : 'MAX';
+    this.q('#pick-cost').textContent = pc ? `▲ ${pc}C` : 'MAX';
   }
 
   private q(sel: string): HTMLElement { return this.root.querySelector(sel)!; }
@@ -100,7 +141,7 @@ export class Hud {
   toggleBuild(type: BuildingType | null): void {
     this.activeBuild = this.activeBuild === type ? null : type;
     this.onBuildSelect(this.activeBuild);
-    for (const el of this.root.querySelectorAll('.build-slot')) {
+    for (const el of this.root.querySelectorAll('#bm-grid .build-slot')) {
       el.classList.toggle('active', (el as HTMLElement).dataset.type === this.activeBuild);
     }
   }
@@ -133,6 +174,14 @@ export class Hud {
   }
   get selected(): number | null { return this.selectedId; }
 
+  /** Reposition the floating selection panel above the building (screen px). */
+  moveSelPanel(pt: { x: number; y: number } | null): void {
+    const panel = this.q('#sel-panel');
+    if (!pt || panel.classList.contains('hidden')) return;
+    panel.style.left = `${pt.x}px`;
+    panel.style.top = `${pt.y}px`;
+  }
+
   updateFrame(wave: number, phase: Phase, phaseTicks: number, res: Resources,
               players: PlayerView[], enemies: EnemyView[], buildings: BuildingView[],
               castleLevel: number, selfId: number): void {
@@ -161,12 +210,13 @@ export class Hud {
     this.q('#boss-bar').classList.toggle('hidden', !boss);
     if (boss) this.q('#boss-fill').style.width = `${(boss.hp / boss.maxHp) * 100}%`;
 
-    // build slot state: locked by castle level, dimmed when unaffordable
-    for (const el of this.root.querySelectorAll('.build-slot')) {
+    // build menu state: locked by castle level, dimmed when unaffordable
+    for (const el of this.root.querySelectorAll('#bm-grid .build-slot')) {
       const type = (el as HTMLElement).dataset.type as BuildingType;
       el.classList.toggle('locked', BUILDINGS[type].unlockCastleLevel > castleLevel);
       const c = BUILDINGS[type].tiers[0]!.cost;
-      const afford = (c.wood ?? 0) <= res.wood && (c.stone ?? 0) <= res.stone && (c.gold ?? 0) <= res.gold;
+      const afford = (c.wood ?? 0) <= res.wood && (c.stone ?? 0) <= res.stone
+        && (c.gold ?? 0) <= res.gold && (c.coins ?? 0) <= res.coins;
       el.classList.toggle('poor', !afford);
     }
 
@@ -362,6 +412,13 @@ export class Hud {
 
   // ---- wave-upgrade vote overlay ----
   onVote: (option: number) => void = () => {};
+  private choiceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Defer until the dawn banner has finished so the two never overlap. */
+  showChoiceDelayed(options: UpgradeDef[]): void {
+    if (this.choiceTimer) clearTimeout(this.choiceTimer);
+    this.choiceTimer = setTimeout(() => this.showChoice(options), 3200);
+  }
 
   showChoice(options: UpgradeDef[]): void {
     const el = this.q('#choice-overlay');
@@ -395,7 +452,10 @@ export class Hud {
     }
   }
 
-  hideChoice(): void { this.q('#choice-overlay').classList.add('hidden'); }
+  hideChoice(): void {
+    if (this.choiceTimer) { clearTimeout(this.choiceTimer); this.choiceTimer = null; }
+    this.q('#choice-overlay').classList.add('hidden');
+  }
 
   banner(text: string, boss: boolean): void {
     const slot = this.q('#banner-slot');

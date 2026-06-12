@@ -355,8 +355,22 @@ button { font-family: inherit; cursor: pointer; }
 /* wave-upgrade vote overlay */
 .choice-overlay {
   position: absolute; top: 16%; left: 50%; transform: translateX(-50%);
-  text-align: center; pointer-events: auto;
+  text-align: center; pointer-events: auto; z-index: 36;
 }
+.choice-overlay * { pointer-events: auto; }
+
+/* central build menu */
+.build-menu {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  padding: 22px 26px; background: rgba(13, 20, 32, 0.95); clip-path: var(--chamfer);
+  border: 1px solid var(--night-3); z-index: 34; backdrop-filter: blur(6px);
+  animation: fade-up 0.18s ease both;
+}
+.bm-title {
+  font-family: var(--font-display); font-weight: 700; letter-spacing: 0.2em;
+  text-transform: uppercase; text-align: center; color: var(--gold); margin-bottom: 14px;
+}
+.bm-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .choice-title {
   font-family: var(--font-display); font-weight: 900; font-size: 1.7rem;
   letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold);
@@ -378,16 +392,17 @@ button { font-family: inherit; cursor: pointer; }
 .choice-card .ds { font-size: 0.78rem; color: var(--steel); line-height: 1.35; }
 .choice-card .vt { margin-top: 8px; min-height: 1.2em; font-size: 1rem; }
 
-/* upgrade tooltip panel */
+/* floating selection panel — anchored above the selected building */
 .sel-panel {
-  position: absolute; bottom: 110px; right: 14px; width: 210px; padding: 14px;
-  background: rgba(13, 20, 32, 0.92); clip-path: var(--chamfer);
-  border: 1px solid var(--night-3);
+  position: absolute; width: 168px; padding: 10px 12px;
+  transform: translate(-50%, calc(-100% - 14px));
+  background: rgba(13, 20, 32, 0.94); clip-path: var(--chamfer-sm);
+  border: 1px solid var(--night-3); z-index: 25;
 }
-.sel-panel .nm { font-family: var(--font-display); letter-spacing: 0.08em; margin-bottom: 2px; }
-.sel-panel .tier { color: var(--ember); font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; }
-.sel-panel .hp { font-size: 0.75rem; color: var(--steel); margin: 6px 0; }
-.sel-panel .btn { width: 100%; margin-top: 6px; padding: 9px 10px; font-size: 0.75rem; }
+.sel-panel .nm { font-family: var(--font-display); font-size: 0.8rem; letter-spacing: 0.06em; }
+.sel-panel .tier { color: var(--ember); font-size: 0.62rem; letter-spacing: 0.18em; text-transform: uppercase; display: inline; }
+.sel-panel .hp { font-size: 0.68rem; color: var(--steel); margin: 3px 0 6px; display: inline; float: right; }
+.sel-panel .btn { width: 100%; margin-top: 4px; padding: 6px 8px; font-size: 0.66rem; }
 
 @media (max-width: 700px) {
   .party-panel, .hud-hint { display: none; }

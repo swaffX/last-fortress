@@ -1,7 +1,7 @@
 import type { BuildingType } from '../types';
 
 export interface TierStats {
-  cost: { wood?: number; stone?: number; gold?: number };
+  cost: { wood?: number; stone?: number; gold?: number; coins?: number };
   hp: number;
   dmg?: number;            // towers / spike
   range?: number;          // world units
@@ -28,9 +28,9 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     { cost: { wood: 80 }, hp: 650 },
   ]},
   stone_wall: { size: 1, unlockCastleLevel: 2, walkable: false, tiers: [
-    { cost: { stone: 15 }, hp: 350 },
-    { cost: { stone: 40 }, hp: 800 },
-    { cost: { stone: 100 }, hp: 1600 },
+    { cost: { stone: 15, coins: 4 }, hp: 350 },
+    { cost: { stone: 40, coins: 10 }, hp: 800 },
+    { cost: { stone: 100, coins: 25 }, hp: 1600 },
   ]},
   gate: { size: 1, unlockCastleLevel: 1, walkable: true, tiers: [
     { cost: { wood: 20 }, hp: 150 },
@@ -53,19 +53,19 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     { cost: { wood: 320, stone: 140, gold: 40 }, hp: 1000, dmg: 100, range: 14, cooldownTicks: 22 },
   ]},
   bomb_tower: { size: 2, unlockCastleLevel: 3, walkable: false, tiers: [
-    { cost: { stone: 100, gold: 10 }, hp: 350, dmg: 35, range: 8, cooldownTicks: 50, aoeRadius: 2.5 },
-    { cost: { stone: 220, gold: 30 }, hp: 650, dmg: 65, range: 9, cooldownTicks: 44, aoeRadius: 3 },
-    { cost: { stone: 450, gold: 80 }, hp: 1200, dmg: 120, range: 10, cooldownTicks: 38, aoeRadius: 3.5 },
+    { cost: { stone: 100, gold: 10, coins: 15 }, hp: 350, dmg: 35, range: 8, cooldownTicks: 50, aoeRadius: 2.5 },
+    { cost: { stone: 220, gold: 30, coins: 35 }, hp: 650, dmg: 65, range: 9, cooldownTicks: 44, aoeRadius: 3 },
+    { cost: { stone: 450, gold: 80, coins: 70 }, hp: 1200, dmg: 120, range: 10, cooldownTicks: 38, aoeRadius: 3.5 },
   ]},
   ice_tower: { size: 2, unlockCastleLevel: 3, walkable: false, tiers: [
-    { cost: { stone: 80, gold: 15 }, hp: 280, dmg: 6, range: 8, cooldownTicks: 20, slowMul: 0.6, slowTicks: 40 },
-    { cost: { stone: 170, gold: 40 }, hp: 520, dmg: 12, range: 9, cooldownTicks: 18, slowMul: 0.5, slowTicks: 50 },
-    { cost: { stone: 350, gold: 90 }, hp: 950, dmg: 22, range: 10, cooldownTicks: 16, slowMul: 0.4, slowTicks: 60 },
+    { cost: { stone: 80, gold: 15, coins: 12 }, hp: 280, dmg: 6, range: 8, cooldownTicks: 20, slowMul: 0.6, slowTicks: 40 },
+    { cost: { stone: 170, gold: 40, coins: 28 }, hp: 520, dmg: 12, range: 9, cooldownTicks: 18, slowMul: 0.5, slowTicks: 50 },
+    { cost: { stone: 350, gold: 90, coins: 55 }, hp: 950, dmg: 22, range: 10, cooldownTicks: 16, slowMul: 0.4, slowTicks: 60 },
   ]},
   lightning_tower: { size: 2, unlockCastleLevel: 4, walkable: false, tiers: [
-    { cost: { stone: 150, gold: 40 }, hp: 320, dmg: 20, range: 9, cooldownTicks: 36, chainTargets: 3 },
-    { cost: { stone: 300, gold: 90 }, hp: 600, dmg: 35, range: 10, cooldownTicks: 32, chainTargets: 4 },
-    { cost: { stone: 600, gold: 200 }, hp: 1100, dmg: 60, range: 11, cooldownTicks: 28, chainTargets: 5 },
+    { cost: { stone: 150, gold: 40, coins: 25 }, hp: 320, dmg: 20, range: 9, cooldownTicks: 36, chainTargets: 3 },
+    { cost: { stone: 300, gold: 90, coins: 55 }, hp: 600, dmg: 35, range: 10, cooldownTicks: 32, chainTargets: 4 },
+    { cost: { stone: 600, gold: 200, coins: 110 }, hp: 1100, dmg: 60, range: 11, cooldownTicks: 28, chainTargets: 5 },
   ]},
   gold_mine: { size: 2, unlockCastleLevel: 2, walkable: false, tiers: [
     { cost: { wood: 100, stone: 50 }, hp: 200, cooldownTicks: 100, income: { gold: 5 } },

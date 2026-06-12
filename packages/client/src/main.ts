@@ -1,6 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
-import { riverParams, generateDecor } from '@lf/shared';
+import { riverParams, generateDecor, BUILDINGS } from '@lf/shared';
 import { Net, type ServerMsg, type ProfileView, type BuildingView, type NodeView } from './net';
 import { Stage } from './render/scene';
 import { World } from './render/world';
@@ -47,8 +47,8 @@ hud.onDemolish = id => {
 };
 input.send = cmd => net.send({ t: 'cmd', cmd });
 input.ping = pos => net.send({ t: 'ping', pos });
-input.onAttack = () => world.lunge(selfId);
 input.onBuildCancel = () => hud.clearBuild();
+hud.onToolUpgrade = tool => net.send({ t: 'upgrade_tool', tool });
 input.onSelectAt = cell => {
   const b = lastFrameBuildings.find(bb => {
     const s = bb.type === 'castle' ? 4 : 2;
@@ -64,11 +64,14 @@ net.on((msg: ServerMsg) => {
   switch (msg.t) {
     case 'welcome':
       profile = msg.profile;
+      hud.setTools(profile.tools);
       if (!inGame) screens.menu(profile);
       break;
     case 'profile':
       profile = msg.profile;
+      hud.setTools(profile.tools);
       if (!inGame) screens.menu(profile);
+      else hud.notify(`🔧 Tool upgraded`);
       break;
     case 'lobby':
       screens.lobby(msg.code, msg.players, msg.host);
@@ -107,6 +110,7 @@ net.on((msg: ServerMsg) => {
       for (const e of msg.events) {
         if (e.kind === 'projectile') world.aimTower(e.from, e.to);
         if (e.kind === 'melee') world.lungePlayerAt(e.pos.x, e.pos.y);
+        if (e.kind === 'gather') world.lungePlayerAt(e.pos.x, e.pos.y);
         if (e.kind === 'node_depleted') {
           world.removeNode(e.nodeId);
           lastNodes = lastNodes.filter(n => n.id !== e.nodeId);
@@ -139,8 +143,7 @@ net.on((msg: ServerMsg) => {
       world.setRemoteGhost(msg.type, msg.pos, msg.ok);
       break;
     case 'choice_offer':
-      hud.showChoice(msg.options);
-      audio.handle([{ kind: 'wave_start', wave: 0, boss: false }]);  // fanfare
+      hud.showChoiceDelayed(msg.options);   // waits out the dawn banner
       break;
     case 'choice_state':
       hud.updateChoiceVotes(msg.votes);
@@ -217,9 +220,9 @@ addEventListener('keydown', e => {
   if (n >= 1 && n <= 9) hud.buildByIndex(n - 1);
   if (e.key.toLowerCase() === 'e') {
     net.send({ t: 'cmd', cmd: { kind: 'gather' } });
-    world.lunge(selfId);
   }
-  if (e.key === 'Escape') { hud.clearBuild(); hud.selectBuilding(null); }
+  if (e.key.toLowerCase() === 'b') hud.toggleBuildMenu();
+  if (e.key === 'Escape') { hud.clearBuild(); hud.selectBuilding(null); hud.toggleBuildMenu(false); }
   if (e.key.toLowerCase() === 'k' && profile) screens.skillTree(profile, true);
   if (e.key.toLowerCase() === 'u' && hud.selected !== null) {
     net.send({ t: 'cmd', cmd: { kind: 'upgrade', buildingId: hud.selected } });
@@ -253,7 +256,7 @@ function loop(now: number): void {
   const selfPos = world.positionOf(selfId);
   if (selfPos) {
     stage.setFollow(selfPos.x, selfPos.z);
-    // gather prompt when a tree/rock is in reach
+    // gather prompt + golden ring on the node E would hit
     if (inGame) {
       let near: NodeView | null = null;
       let nd = 2.2;
@@ -261,7 +264,37 @@ function loop(now: number): void {
         const d = Math.hypot(n.pos.x + 0.5 - selfPos.x, n.pos.y + 0.5 - selfPos.z);
         if (d <= nd) { nd = d; near = n; }
       }
-      hud.showPrompt(near ? `[E] Gather ${near.kind === 'tree' ? 'wood' : 'stone'}` : null);
+      hud.showPrompt(near
+        ? `[E] ${near.kind === 'tree' ? '🪓 Chop wood' : '⛏ Mine stone'}`
+        : null);
+      world.highlightNode(near?.id ?? null);
+
+      // hover affordance on placed buildings (outside build mode)
+      if (!input.activeType) {
+        const w = stage.screenToWorld(input.cursor.x, input.cursor.y);
+        const cell = { x: Math.floor(w.x), y: Math.floor(w.y) };
+        const hovered = lastFrameBuildings.find(b => {
+          const s = b.type === 'castle' ? 4 : BUILDINGS[b.type].size;
+          return cell.x >= b.pos.x && cell.x < b.pos.x + s &&
+                 cell.y >= b.pos.y && cell.y < b.pos.y + s;
+        }) ?? null;
+        world.setHover(hovered);
+        document.body.style.cursor = hovered ? 'pointer' : '';
+      } else {
+        world.setHover(null);
+        document.body.style.cursor = '';
+      }
+
+      // keep the selection panel pinned above its building
+      if (hud.selected !== null) {
+        const b = lastFrameBuildings.find(bb => bb.id === hud.selected);
+        if (b) {
+          const s = BUILDINGS[b.type].size;
+          hud.moveSelPanel(project(b.pos.x + s / 2, b.pos.y));
+        } else {
+          hud.selectBuilding(null);   // destroyed while selected
+        }
+      }
     }
   }
   effects.update(dt);

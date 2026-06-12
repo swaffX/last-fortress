@@ -34,6 +34,10 @@ export class Audio {
           break;
         case 'melee': this.sfx('swing', () => this.swing()); break;
         case 'splash': this.sfx('splash', () => this.splash()); break;
+        case 'gather':
+          if (e.resource === 'wood') this.sfx('chop', () => this.chop());
+          else this.sfx('mine', () => this.mine());
+          break;
         case 'explosion': this.sfx('boom', () => this.boom()); break;
         case 'chain': this.sfx('zap', () => this.zap()); break;
         case 'death': this.sfx('growl', () => this.growl()); break;
@@ -120,6 +124,29 @@ export class Audio {
     const o = this.osc('sawtooth', 880, g, 0.15);
     o.frequency.exponentialRampToValueAtTime(140, this.ctx.currentTime + 0.14);
   }
+  /** axe biting into wood: sharp knock + woody resonance */
+  chop(): void {
+    if (!this.ctx) return;
+    const g = this.env(0.16, 0.18);
+    const o = this.osc('triangle', 180, g, 0.16);
+    o.frequency.exponentialRampToValueAtTime(90, this.ctx.currentTime + 0.14);
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 2;
+    f.connect(this.env(0.06, 0.12));
+    this.noise(0.06, f);
+  }
+
+  /** pickaxe on rock: bright metallic clink + stony crunch */
+  mine(): void {
+    if (!this.ctx) return;
+    const g = this.env(0.1, 0.1);
+    this.osc('square', 2400 + Math.random() * 600, g, 0.05);
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'highpass'; f.frequency.value = 900;
+    f.connect(this.env(0.14, 0.1));
+    this.noise(0.14, f);
+  }
+
   /** soft boot-on-grass thud; quieter for teammates */
   footstep(self: boolean): void {
     if (!this.ctx) return;

@@ -29,8 +29,9 @@ export class Input {
 
   send: (cmd: Command) => void = () => {};
   ping: (pos: { x: number; y: number }) => void = () => {};
-  onAttack: () => void = () => {};
   onBuildCancel: () => void = () => {};
+  /** current cursor position in screen px — used for hover queries */
+  get cursor(): { x: number; y: number } { return { x: this.mouse.x, y: this.mouse.y }; }
   private lastPlacedCell: string | null = null;
   onSelectAt: (cell: { x: number; y: number }) => void = () => {};
   buildings: BuildingView[] = [];
@@ -66,15 +67,12 @@ export class Input {
         }
         return;
       }
-      // building under cursor → select; otherwise attack
+      // building under cursor → select; empty ground → just deselect.
+      // Combat is fully automatic — bare clicks trigger nothing.
       const cell = { x: Math.floor(w.x), y: Math.floor(w.y) };
       const hit = this.buildingAt(cell);
       if (hit) { this.onSelectAt(cell); return; }
-      this.mouse.down = true;
       this.onSelectAt({ x: -1, y: -1 });  // deselect
-      // fire immediately — waiting for the 50 ms tick swallows quick clicks
-      this.send({ kind: 'attack', dir: { x: w.x, y: w.y } });
-      this.onAttack();
     });
     addEventListener('pointerup', e => {
       if (this.rectAnchor && this.buildType) {
@@ -216,11 +214,6 @@ export class Input {
   tick(): void {
     const { x: dx, y: dy } = this.dir;
     if (dx || dy) this.send({ kind: 'move', dir: { x: dx, y: dy } });
-    if (this.mouse.down && !this.buildType) {
-      const w = this.stage.screenToWorld(this.mouse.x, this.mouse.y);
-      this.send({ kind: 'attack', dir: { x: w.x, y: w.y } });
-      this.onAttack();
-    }
     if (this.keys.has('r') && this.ghost) {
       this.ghostRot += Math.PI / 2;
       this.ghost.children[0]!.rotation.y = this.ghostRot;

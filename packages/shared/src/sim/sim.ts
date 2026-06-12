@@ -30,7 +30,11 @@ const PROJECTILE_SPEED: Record<ProjectileKind, number> = {
   arrow: 16, bolt: 19, spit: 9, bomb: 8,
 };
 const ENEMY_AGGRO_RANGE = 6;     // players this close pull zombies off the castle path
-const GATHER_RANGE = 2.2;        // E-key interaction reach
+// E-key reach. Slightly larger than the client prompt radius (2.2) so a
+// prediction lead can never show the prompt while the server says "too far".
+const GATHER_RANGE = 2.8;
+/** tool tier → resources per swing */
+const TOOL_YIELD = [0, 4, 7, 11];
 
 export class Sim {
   readonly state: SimState;
@@ -76,7 +80,8 @@ export class Sim {
     return this.state.buildings.get(this.state.castleId)?.tier ?? 1;
   }
 
-  addPlayer(klass: ClassType, skills: string[] = []): Player {
+  addPlayer(klass: ClassType, skills: string[] = [],
+            tools: { axe: number; pick: number } = { axe: 1, pick: 1 }): Player {
     const id = this.state.nextId++;
     const p: Player = {
       id, klass, weapon: klass === 'knight' ? 'sword' : 'bow',
@@ -84,9 +89,16 @@ export class Sim {
       hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP,
       attackCooldown: 0, alive: true, respawnTicks: 0,
       mods: applySkills(skills),
+      axeTier: tools.axe, pickTier: tools.pick, gatherCooldown: 0,
     };
     this.state.players.set(id, p);
     return p;
+  }
+
+  setPlayerTool(playerId: EntityId, tool: 'axe' | 'pick', tier: number): void {
+    const p = this.state.players.get(playerId);
+    if (!p) return;
+    if (tool === 'axe') p.axeTier = tier; else p.pickTier = tier;
   }
 
   removePlayer(id: EntityId): void {
@@ -269,15 +281,16 @@ export class Sim {
   private stepGather(events: SimEvent[]): void {
     for (const pid of this.gatherIntent) {
       const p = this.state.players.get(pid);
-      if (!p || !p.alive || p.attackCooldown > 0) continue;
+      if (!p || !p.alive || p.gatherCooldown > 0) continue;   // independent of combat cooldown
       let best: { node: ResourceNode; d: number } | null = null;
       for (const n of this.state.nodes.values()) {
         const d = dist({ x: n.pos.x + 0.5, y: n.pos.y + 0.5 }, p.pos);
         if (d <= GATHER_RANGE && (!best || d < best.d)) best = { node: n, d };
       }
       if (!best) continue;
-      p.attackCooldown = 12;
-      const take = Math.min(GATHER_AMOUNT, best.node.amount);
+      p.gatherCooldown = 8;
+      const tier = best.node.kind === 'tree' ? p.axeTier : p.pickTier;
+      const take = Math.min(TOOL_YIELD[Math.min(3, Math.max(1, tier))]!, best.node.amount);
       best.node.amount -= take;
       const kind = best.node.kind === 'tree' ? 'wood' : 'stone';
       this.state.resources[kind] += take;
@@ -290,7 +303,6 @@ export class Sim {
         this.state.nodes.delete(best.node.id);
         events.push({ kind: 'node_depleted', nodeId: best.node.id, pos: { ...best.node.pos } });
       }
-      events.push({ kind: 'melee', pos: { ...p.pos } });   // chop animation + sfx
     }
   }
 
@@ -658,6 +670,7 @@ export class Sim {
     for (const p of this.state.players.values()) {
       if (!p.alive) continue;
       if (p.attackCooldown > 0) p.attackCooldown--;
+      if (p.gatherCooldown > 0) p.gatherCooldown--;
       const dir = this.moveIntent.get(p.id);
       if (dir) {
         const wading = inRiver(p.pos, this.river);

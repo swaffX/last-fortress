@@ -53,6 +53,50 @@ export class World {
   /** Fired once per stride of any walking player (footprints, dust, sfx). */
   onStep: (x: number, z: number, heading: number, side: -1 | 1, isSelf: boolean) => void = () => {};
 
+  // ---- hover outline: parchment frame around the building under the cursor ----
+  private hoverLine: THREE.Line | null = null;
+  private hoverKey = '';
+
+  setHover(b: BuildingView | null): void {
+    const key = b ? `${b.id}` : '';
+    if (key === this.hoverKey) return;
+    this.hoverKey = key;
+    if (this.hoverLine) { this.scene.remove(this.hoverLine); this.hoverLine = null; }
+    if (!b) return;
+    const s = BUILDINGS[b.type].size;
+    const x0 = b.pos.x - 0.08, x1 = b.pos.x + s + 0.08;
+    const z0 = b.pos.y - 0.08, z1 = b.pos.y + s + 0.08;
+    const pts = [
+      new THREE.Vector3(x0, 0.1, z0), new THREE.Vector3(x1, 0.1, z0),
+      new THREE.Vector3(x1, 0.1, z1), new THREE.Vector3(x0, 0.1, z1),
+      new THREE.Vector3(x0, 0.1, z0),
+    ];
+    this.hoverLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: 0xe8dfc8 }));
+    this.scene.add(this.hoverLine);
+  }
+
+  // ---- lootable highlight: pulsing ring under the node the E key would hit ----
+  private nodeRing: THREE.Mesh | null = null;
+  private nodeRingTarget: EntityId | null = null;
+
+  highlightNode(id: EntityId | null): void {
+    if (id === this.nodeRingTarget) return;
+    this.nodeRingTarget = id;
+    if (!this.nodeRing) {
+      this.nodeRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.55, 0.72, 16),
+        new THREE.MeshBasicMaterial({ color: 0xffd24a, transparent: true, opacity: 0.8, depthWrite: false }));
+      this.nodeRing.rotation.x = -Math.PI / 2;
+      this.nodeRing.position.y = 0.06;
+      this.scene.add(this.nodeRing);
+    }
+    const g = id !== null ? this.nodes.get(id) : undefined;
+    this.nodeRing.visible = !!g;
+    if (g) this.nodeRing.position.set(g.position.x, 0.06, g.position.z);
+  }
+
   // ---- teammate's build cursor: same green/red preview you see yourself ----
   private remoteGhost: THREE.Group | null = null;
   private remoteGhostKind: string | null = null;
@@ -296,15 +340,16 @@ export class World {
     if (t && t.attackT <= 0) t.attackT = 1;
   }
 
-  /** Swing animation for whichever player stands at a melee-hit position. */
+  /** Swing animation for the nearest player to an action position (hits, chops). */
   lungePlayerAt(x: number, y: number): void {
+    let best: Tracked | null = null;
+    let bd = 3.4;
     for (const [, t] of this.tracked) {
       if (!t.kind.startsWith('player:')) continue;
-      if (Math.hypot(t.obj.position.x - x, t.obj.position.z - y) < 1 && t.attackT <= 0) {
-        t.attackT = 1;
-        return;
-      }
+      const d = Math.hypot(t.obj.position.x - x, t.obj.position.z - y);
+      if (d < bd) { bd = d; best = t; }
     }
+    if (best && best.attackT <= 0) best.attackT = 1;
   }
 
   /** dt-based interpolation + prediction + procedural animation. */
@@ -364,6 +409,13 @@ export class World {
       } else {
         this.animateBuilding(t, dt);
       }
+    }
+
+    // lootable ring pulse
+    if (this.nodeRing?.visible) {
+      const k = 1 + Math.sin(this.time * 5) * 0.12;
+      this.nodeRing.scale.setScalar(k);
+      (this.nodeRing.material as THREE.MeshBasicMaterial).opacity = 0.55 + Math.sin(this.time * 5) * 0.25;
     }
 
     // ambient: tree sway
