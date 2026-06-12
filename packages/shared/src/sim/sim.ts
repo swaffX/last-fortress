@@ -44,7 +44,6 @@ export class Sim {
   readonly river: RiverParams;
   readonly decor: Decor[];
   private moveIntent = new Map<EntityId, Vec2>();
-  private gatherIntent = new Set<EntityId>();
   private buildQueue: { playerId: EntityId; type: BuildingType; pos: Vec2 }[] = [];
   private upgradeQueue: EntityId[] = [];
   private demolishQueue: EntityId[] = [];
@@ -68,10 +67,11 @@ export class Sim {
     };
     const castle = this.makeBuilding('castle', CASTLE_POS, 1);
     this.state.castleId = castle.id;
-    // resource nodes occupy the grid so buildings can't overlap them
+    // resource nodes occupy the grid so buildings can't overlap them.
+    // Sized so one full channel fells a tree in ~6 swings (~2.5 s at tier I).
     for (const n of this.map.nodes) {
       const id = this.state.nextId++;
-      this.state.nodes.set(id, { id, kind: n.kind, pos: n.pos, amount: 200 });
+      this.state.nodes.set(id, { id, kind: n.kind, pos: n.pos, amount: n.kind === 'tree' ? 24 : 36 });
       this.grid.occupy(n.pos, 1, id);
     }
   }
@@ -89,7 +89,7 @@ export class Sim {
       hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP,
       attackCooldown: 0, alive: true, respawnTicks: 0,
       mods: applySkills(skills),
-      axeTier: tools.axe, pickTier: tools.pick, gatherCooldown: 0,
+      axeTier: tools.axe, pickTier: tools.pick, gatherCooldown: 0, gatherTarget: null,
     };
     this.state.players.set(id, p);
     return p;
@@ -104,7 +104,6 @@ export class Sim {
   removePlayer(id: EntityId): void {
     this.state.players.delete(id);
     this.moveIntent.delete(id);
-    this.gatherIntent.delete(id);
   }
 
   applyCommand(playerId: EntityId, cmd: Command): void {
@@ -113,7 +112,17 @@ export class Sim {
     switch (cmd.kind) {
       case 'move': this.moveIntent.set(playerId, cmd.dir); break;
       case 'attack': break;   // combat is automatic; kept for protocol compat
-      case 'gather': this.gatherIntent.add(playerId); break;
+      case 'gather': {
+        // single press starts a channel on the nearest node in reach
+        let best: ResourceNode | null = null;
+        let bd = 2.8;
+        for (const n of this.state.nodes.values()) {
+          const d = dist({ x: n.pos.x + 0.5, y: n.pos.y + 0.5 }, p.pos);
+          if (d <= bd) { bd = d; best = n; }
+        }
+        if (best) p.gatherTarget = best.id;
+        break;
+      }
       case 'build': this.buildQueue.push({ playerId, type: cmd.type, pos: cmd.pos }); break;
       case 'upgrade': this.upgradeQueue.push(cmd.buildingId); break;
       case 'demolish': this.demolishQueue.push(cmd.buildingId); break;
@@ -137,7 +146,6 @@ export class Sim {
     this.stepSeparation();
     this.stepSupport();
     this.stepRespawns();
-    this.gatherIntent.clear();
     return events;
   }
 
@@ -278,30 +286,34 @@ export class Sim {
     }
   }
 
+  /** Channeled gathering: one E press keeps the player swinging until the
+   *  node is destroyed, the player walks away, or the player moves. */
   private stepGather(events: SimEvent[]): void {
-    for (const pid of this.gatherIntent) {
-      const p = this.state.players.get(pid);
-      if (!p || !p.alive || p.gatherCooldown > 0) continue;   // independent of combat cooldown
-      let best: { node: ResourceNode; d: number } | null = null;
-      for (const n of this.state.nodes.values()) {
-        const d = dist({ x: n.pos.x + 0.5, y: n.pos.y + 0.5 }, p.pos);
-        if (d <= GATHER_RANGE && (!best || d < best.d)) best = { node: n, d };
-      }
-      if (!best) continue;
+    for (const p of this.state.players.values()) {
+      if (p.gatherTarget === null) continue;
+      if (!p.alive) { p.gatherTarget = null; continue; }
+      const node = this.state.nodes.get(p.gatherTarget);
+      if (!node) { p.gatherTarget = null; continue; }
+      const center = { x: node.pos.x + 0.5, y: node.pos.y + 0.5 };
+      if (dist(center, p.pos) > GATHER_RANGE + 0.4) { p.gatherTarget = null; continue; }
+      if (p.gatherCooldown > 0) continue;
       p.gatherCooldown = 8;
-      const tier = best.node.kind === 'tree' ? p.axeTier : p.pickTier;
-      const take = Math.min(TOOL_YIELD[Math.min(3, Math.max(1, tier))]!, best.node.amount);
-      best.node.amount -= take;
-      const kind = best.node.kind === 'tree' ? 'wood' : 'stone';
+      const tier = node.kind === 'tree' ? p.axeTier : p.pickTier;
+      const take = Math.min(TOOL_YIELD[Math.min(3, Math.max(1, tier))]!, node.amount);
+      node.amount -= take;
+      const kind = node.kind === 'tree' ? 'wood' : 'stone';
       this.state.resources[kind] += take;
       events.push({
         kind: 'gather', resource: kind, amount: take,
-        pos: { x: best.node.pos.x + 0.5, y: best.node.pos.y + 0.5 },
+        nodeId: node.id, remaining: node.amount, pos: { ...center },
       });
-      if (best.node.amount <= 0) {
-        this.grid.clear(best.node.pos, 1);
-        this.state.nodes.delete(best.node.id);
-        events.push({ kind: 'node_depleted', nodeId: best.node.id, pos: { ...best.node.pos } });
+      if (node.amount <= 0) {
+        this.grid.clear(node.pos, 1);
+        this.state.nodes.delete(node.id);
+        events.push({ kind: 'node_depleted', nodeId: node.id, pos: { ...node.pos } });
+        for (const other of this.state.players.values()) {
+          if (other.gatherTarget === node.id) other.gatherTarget = null;
+        }
       }
     }
   }
@@ -673,6 +685,7 @@ export class Sim {
       if (p.gatherCooldown > 0) p.gatherCooldown--;
       const dir = this.moveIntent.get(p.id);
       if (dir) {
+        p.gatherTarget = null;   // moving cancels the gathering channel
         const wading = inRiver(p.pos, this.river);
         const speed = PLAYER_SPEED * this.state.bonuses.playerSpeedMul * (wading ? 0.5 : 1);
         const len = Math.hypot(dir.x, dir.y) || 1;

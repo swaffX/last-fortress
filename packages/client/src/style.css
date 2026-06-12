@@ -344,12 +344,20 @@ button { font-family: inherit; cursor: pointer; }
   font-family: var(--font-body); font-size: 0.85rem; outline: none;
 }
 
-/* interaction prompt */
+/* interaction prompt + channel progress */
 .interact-prompt {
   position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%);
-  padding: 8px 18px; background: rgba(13, 20, 32, 0.9); clip-path: var(--chamfer-sm);
+  padding: 8px 18px; min-width: 160px; text-align: center;
+  background: rgba(13, 20, 32, 0.9); clip-path: var(--chamfer-sm);
   border: 1px solid var(--ember); font-weight: 700; letter-spacing: 0.06em;
   pointer-events: none; animation: fade-up 0.2s both;
+}
+.interact-prompt .ip-track {
+  height: 7px; margin-top: 6px; background: var(--night-0); overflow: hidden;
+}
+.interact-prompt .ip-fill {
+  height: 100%; background: linear-gradient(90deg, var(--verdant), #9ade6a);
+  transition: width 0.15s linear;
 }
 
 /* wave-upgrade vote overlay */

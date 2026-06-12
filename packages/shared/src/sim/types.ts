@@ -56,6 +56,7 @@ export interface Player {
   axeTier: number;         // 1..3 — wood yield
   pickTier: number;        // 1..3 — stone yield
   gatherCooldown: number;  // separate from combat so E always responds
+  gatherTarget: EntityId | null;   // channeling: keeps swinging until done or moved
 }
 
 export interface ResourceNode {
@@ -126,7 +127,8 @@ export type SimEvent =
   | { kind: 'melee'; pos: Vec2 }
   | { kind: 'splash'; pos: Vec2 }
   | { kind: 'node_depleted'; nodeId: EntityId; pos: Vec2 }
-  | { kind: 'gather'; pos: Vec2; resource: 'wood' | 'stone'; amount: number }
+  | { kind: 'gather'; pos: Vec2; resource: 'wood' | 'stone'; amount: number;
+      nodeId: EntityId; remaining: number }
   | { kind: 'explosion'; pos: Vec2; radius: number }
   | { kind: 'chain'; points: Vec2[] }
   | { kind: 'death'; pos: Vec2; enemy: EnemyType }

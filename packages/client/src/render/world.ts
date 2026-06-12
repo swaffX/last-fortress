@@ -238,6 +238,16 @@ export class World {
     if (g) { this.scene.remove(g); this.nodes.delete(id); }
   }
 
+  // ---- destruction: trees topple over, rocks crumble into the ground ----
+  private dying: { obj: THREE.Group; t: number; kind: 'tree' | 'rock'; dir: number }[] = [];
+
+  breakNode(id: EntityId, kind: 'tree' | 'rock'): void {
+    const g = this.nodes.get(id);
+    if (!g) return;
+    this.nodes.delete(id);
+    this.dying.push({ obj: g, t: 1, kind, dir: Math.random() * Math.PI * 2 });
+  }
+
   private upsert(id: EntityId, kind: string, x: number, y: number,
                  make: () => THREE.Group, hpRatio: number, barHeight = 2): Tracked {
     let t = this.tracked.get(id);
@@ -430,6 +440,31 @@ export class World {
         }
       } else {
         this.animateBuilding(t, dt);
+      }
+    }
+
+    // falling trees / crumbling rocks
+    for (let i = this.dying.length - 1; i >= 0; i--) {
+      const d = this.dying[i]!;
+      d.t -= dt;
+      if (d.t <= 0) {
+        this.scene.remove(d.obj);
+        this.dying.splice(i, 1);
+        continue;
+      }
+      const k = 1 - d.t;   // 0 → 1 over the second
+      if (d.kind === 'tree') {
+        // tip over with accelerating ease, then sink into the ground
+        const fall = Math.min(1, k * 1.6);
+        d.obj.rotation.x = Math.cos(d.dir) * fall * (Math.PI / 2.2);
+        d.obj.rotation.z = Math.sin(d.dir) * fall * (Math.PI / 2.2);
+        if (k > 0.65) d.obj.position.y = -(k - 0.65) * 2.2;
+      } else {
+        // rocks shrink and sink
+        const s = Math.max(0.01, 1 - k * 1.2);
+        d.obj.scale.setScalar(s);
+        d.obj.position.y = -k * 0.4;
+        d.obj.rotation.y += dt * 2;
       }
     }
 

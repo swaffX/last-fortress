@@ -404,12 +404,16 @@ export class Hud {
     if (send && text) this.onChat(text);
   }
 
-  /** Contextual interaction prompt, e.g. "[E] Gather wood". */
-  showPrompt(label: string | null): void {
+  /** Contextual interaction prompt; with `progress` it becomes a channel bar. */
+  showPrompt(label: string | null, progress: number | null = null): void {
     const el = this.q('#interact-prompt');
     if (!label) { el.classList.add('hidden'); return; }
-    if (el.textContent !== label) el.textContent = label;
     el.classList.remove('hidden');
+    if (progress !== null) {
+      el.innerHTML = `<span>${label}</span><div class="ip-track"><div class="ip-fill" style="width:${Math.round(progress * 100)}%"></div></div>`;
+    } else if (el.textContent !== label || el.querySelector('.ip-track')) {
+      el.textContent = label;
+    }
   }
 
   // ---- wave-upgrade vote overlay ----

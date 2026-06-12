@@ -124,6 +124,33 @@ export class Audio {
     const o = this.osc('sawtooth', 880, g, 0.15);
     o.frequency.exponentialRampToValueAtTime(140, this.ctx.currentTime + 0.14);
   }
+  /** creaking crack + whump as a tree comes down */
+  treeFall(): void {
+    if (!this.ctx) return;
+    const g = this.env(0.5, 0.22);
+    const o = this.osc('sawtooth', 140, g, 0.5);
+    o.frequency.exponentialRampToValueAtTime(45, this.ctx.currentTime + 0.45);
+    setTimeout(() => {
+      if (!this.ctx) return;
+      const f = this.ctx.createBiquadFilter();
+      f.type = 'lowpass'; f.frequency.value = 400;
+      f.connect(this.env(0.3, 0.25));
+      this.noise(0.3, f);
+    }, 350);
+  }
+
+  /** rumbling crunch as a boulder breaks apart */
+  rockBreak(): void {
+    if (!this.ctx) return;
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = 600;
+    f.connect(this.env(0.4, 0.25));
+    this.noise(0.4, f);
+    const g = this.env(0.25, 0.15);
+    const o = this.osc('sine', 90, g, 0.25);
+    o.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.22);
+  }
+
   /** axe biting into wood: sharp knock + woody resonance */
   chop(): void {
     if (!this.ctx) return;

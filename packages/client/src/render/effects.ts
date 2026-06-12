@@ -115,6 +115,25 @@ export class Effects {
     }
   }
 
+  /** Node destruction: wood splinters + leaves, or stone shards + dust. */
+  nodeBreak(x: number, y: number, kind: 'tree' | 'rock'): void {
+    if (kind === 'tree') {
+      this.burst(x, y, 0x8a6238, 14, 0.7, 4);     // splinters
+      this.burst(x, y, 0x3f7a33, 10, 0.9, 3);     // leaves
+      this.shockwave(x, y, 1.6, 0x8a6238);
+    } else {
+      this.burst(x, y, 0x7d8087, 14, 0.7, 4);     // shards
+      this.burst(x, y, 0xb8b4a8, 8, 0.5, 2.5);    // dust
+      this.shockwave(x, y, 1.4, 0x9aa0a8);
+    }
+    this.stage.addShake(0.12);
+  }
+
+  /** small chip burst on every gathering swing */
+  gatherHit(x: number, y: number, kind: 'wood' | 'stone'): void {
+    this.burst(x, y, kind === 'wood' ? 0xa3845c : 0x9aa0a8, 4, 0.35, 2.2);
+  }
+
   /** Soft dust puff kicked up behind a moving character (wind trail). */
   trail(x: number, z: number): void {
     const p = this.spawn(x + (Math.random() - 0.5) * 0.3, z + (Math.random() - 0.5) * 0.3, 0xcfd8cf);

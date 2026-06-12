@@ -371,6 +371,8 @@ function validCommand(cmd: Command): boolean {
   switch (cmd.kind) {
     case 'move': case 'attack':
       return isFiniteVec(cmd.dir);
+    case 'gather':
+      return true;
     case 'build':
       return typeof cmd.type === 'string' && cmd.type in BUILDINGS && isFiniteVec(cmd.pos);
     case 'upgrade': case 'demolish':

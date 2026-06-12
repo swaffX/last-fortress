@@ -27,6 +27,8 @@ let inGame = false;
 let lastFrameBuildings: BuildingView[] = [];
 let lastNodes: NodeView[] = [];
 let selfId = -1;
+// gathering progress: node id → { remaining, total, lastHitAt }
+const nodeProgress = new Map<number, { remaining: number; total: number; lastHitAt: number }>();
 
 // ---- wiring: screens → net ----
 screens.onCreate = (klass, solo) => { audio.unlock(); net.send({ t: 'create_lobby', klass, solo }); };
@@ -93,6 +95,10 @@ net.on((msg: ServerMsg) => {
       lastNodes = msg.nodes;
       world.setNodes(msg.nodes);
       input.nodes = msg.nodes;
+      nodeProgress.clear();
+      for (const n of msg.nodes) {
+        nodeProgress.set(n.id, { remaining: n.amount, total: n.amount, lastHitAt: 0 });
+      }
       env?.dispose();
       env = new Environment(stage.scene, msg.seed, msg.nodes);
       hud.initMinimapTerrain(msg.seed, msg.nodes);
@@ -110,12 +116,21 @@ net.on((msg: ServerMsg) => {
       for (const e of msg.events) {
         if (e.kind === 'projectile') world.aimTower(e.from, e.to);
         if (e.kind === 'melee') world.lungePlayerAt(e.pos.x, e.pos.y);
-        if (e.kind === 'gather') world.gatherSwing(e.pos.x, e.pos.y, e.resource);
+        if (e.kind === 'gather') {
+          world.gatherSwing(e.pos.x, e.pos.y, e.resource);
+          effects.gatherHit(e.pos.x, e.pos.y, e.resource);
+          const np = nodeProgress.get(e.nodeId);
+          if (np) { np.remaining = e.remaining; np.lastHitAt = performance.now(); }
+        }
         if (e.kind === 'node_depleted') {
-          world.removeNode(e.nodeId);
+          const wasTree = lastNodes.find(n => n.id === e.nodeId)?.kind ?? 'tree';
+          world.breakNode(e.nodeId, wasTree);
+          effects.nodeBreak(e.pos.x + 0.5, e.pos.y + 0.5, wasTree);
+          if (wasTree === 'tree') audio.treeFall(); else audio.rockBreak();
           lastNodes = lastNodes.filter(n => n.id !== e.nodeId);
           input.nodes = lastNodes;
           hud.removeMinimapNode(e.nodeId);
+          nodeProgress.delete(e.nodeId);
         }
       }
       effects.handle(msg.events);
@@ -216,6 +231,7 @@ addEventListener('keydown', e => {
   }
   if (e.key === 'Enter') { hud.openChat(); e.preventDefault(); return; }
   if (e.target instanceof HTMLInputElement) return;
+  if (e.key.toLowerCase() === 'e') net.send({ t: 'cmd', cmd: { kind: 'gather' } });
   if (e.key.toLowerCase() === 'b') hud.toggleBuildMenu();
   if (e.key === 'Escape') { hud.clearBuild(); hud.selectBuilding(null); hud.toggleBuildMenu(false); }
   if (e.key.toLowerCase() === 'k' && profile) screens.skillTree(profile, true);
@@ -259,9 +275,18 @@ function loop(now: number): void {
         const d = Math.hypot(n.pos.x + 0.5 - selfPos.x, n.pos.y + 0.5 - selfPos.z);
         if (d <= nd) { nd = d; near = n; }
       }
-      hud.showPrompt(near
-        ? `[E] ${near.kind === 'tree' ? '🪓 Chop wood' : '⛏ Mine stone'}`
-        : null);
+      if (near) {
+        const np = nodeProgress.get(near.id);
+        const channeling = np && performance.now() - np.lastHitAt < 900;
+        if (channeling && np) {
+          hud.showPrompt(near.kind === 'tree' ? '🪓 Chopping…' : '⛏ Mining…',
+            1 - np.remaining / np.total);
+        } else {
+          hud.showPrompt(`[E] ${near.kind === 'tree' ? '🪓 Chop wood' : '⛏ Mine stone'}`);
+        }
+      } else {
+        hud.showPrompt(null);
+      }
       world.highlightNode(near?.id ?? null);
 
       // hover affordance on placed buildings (outside build mode)
