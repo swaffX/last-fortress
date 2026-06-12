@@ -1,3 +1,5 @@
+import type { SkillModifiers } from './data/skills';
+
 export interface Vec2 { x: number; y: number; }
 
 export type ResourceKind = 'wood' | 'stone' | 'gold' | 'coins';
@@ -50,6 +52,7 @@ export interface Player {
   attackCooldown: number;
   alive: boolean;
   respawnTicks: number;
+  mods: SkillModifiers;
 }
 
 export interface ResourceNode {
