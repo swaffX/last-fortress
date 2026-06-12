@@ -51,6 +51,10 @@ input.send = cmd => net.send({ t: 'cmd', cmd });
 input.ping = pos => net.send({ t: 'ping', pos });
 input.onBuildCancel = () => hud.clearBuild();
 hud.onToolUpgrade = tool => net.send({ t: 'upgrade_tool', tool });
+hud.onCombatUpgrade = () => net.send({ t: 'cmd', cmd: { kind: 'upgrade_combat' } });
+world.onBuildingHit = (x, z) => effects.gatherHit(x, z, 'stone');   // dust puff on struck walls
+let prevCombatLevel = 0;
+let prevTools = { axe: 1, pick: 1 };
 input.onSelectAt = cell => {
   const b = lastFrameBuildings.find(bb => {
     const s = bb.type === 'castle' ? 4 : 2;
@@ -69,12 +73,22 @@ net.on((msg: ServerMsg) => {
       hud.setTools(profile.tools);
       if (!inGame) screens.menu(profile);
       break;
-    case 'profile':
-      profile = msg.profile;
+    case 'profile': {
+      const newProfile = msg.profile;
+      if (inGame) {
+        if (newProfile.tools.axe > prevTools.axe) {
+          hud.slotPopup('inv-axe', `🪓 Axe Tier ${['', 'I', 'II', 'III'][newProfile.tools.axe]}!`);
+        }
+        if (newProfile.tools.pick > prevTools.pick) {
+          hud.slotPopup('inv-pick', `⛏ Pick Tier ${['', 'I', 'II', 'III'][newProfile.tools.pick]}!`);
+        }
+      }
+      prevTools = { ...newProfile.tools };
+      profile = newProfile;
       hud.setTools(profile.tools);
       if (!inGame) screens.menu(profile);
-      else hud.notify(`🔧 Tool upgraded`);
       break;
+    }
     case 'lobby':
       screens.lobby(msg.code, msg.players, msg.host);
       break;
@@ -142,6 +156,15 @@ net.on((msg: ServerMsg) => {
       hud.updateFrame(msg.wave, msg.phase, msg.phaseTicks, msg.resources,
         msg.players, msg.enemies, msg.buildings, castle?.tier ?? 1, selfId);
       hud.handleEvents(msg.events, project);
+      {
+        const self = msg.players.find(p => p.id === selfId);
+        if (self && self.combatLevel > prevCombatLevel) {
+          const milestone = self.combatLevel % 5 === 0;
+          hud.slotPopup('inv-strike',
+            milestone ? `⚔️ Lv ${self.combatLevel} — DMG + SPEED!` : `⚔️ Strike Lv ${self.combatLevel}!`);
+          prevCombatLevel = self.combatLevel;
+        }
+      }
       break;
     }
     case 'ping': {

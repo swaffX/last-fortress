@@ -27,7 +27,8 @@ export interface EnemyView {
   id: EntityId; type: EnemyType; pos: Vec2; hp: number; maxHp: number; slowed: boolean; enraged: boolean;
 }
 export interface PlayerView {
-  id: EntityId; klass: ClassType; pos: Vec2; hp: number; maxHp: number; alive: boolean; name: string;
+  id: EntityId; klass: ClassType; pos: Vec2; hp: number; maxHp: number;
+  alive: boolean; name: string; combatLevel: number;
 }
 export interface NodeView {
   id: EntityId; kind: 'tree' | 'rock'; pos: Vec2; amount: number;

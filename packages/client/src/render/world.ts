@@ -24,6 +24,8 @@ interface Tracked {
   stepSign: number;        // walk-cycle phase sign, flips on each stride
   toolT: number;           // >0 while a gathering tool is in hand
   toolKind: 'axe' | 'pick' | null;
+  hitT: number;            // >0 right after taking damage — flash/shake window
+  lastHp: number;
 }
 
 /** shortest-path angular damp: eases rotation instead of snapping */
@@ -248,6 +250,9 @@ export class World {
     this.dying.push({ obj: g, t: 1, kind, dir: Math.random() * Math.PI * 2 });
   }
 
+  /** Fired when a tracked building loses hp — main spawns dust there. */
+  onBuildingHit: (x: number, z: number) => void = () => {};
+
   private upsert(id: EntityId, kind: string, x: number, y: number,
                  make: () => THREE.Group, hpRatio: number, barHeight = 2): Tracked {
     let t = this.tracked.get(id);
@@ -270,6 +275,12 @@ export class World {
       t.from.copy(t.obj.position);
       t.to.set(x, 0, y);
     }
+    // damage-taken feedback: hp dropped since the last frame
+    if (t.lastHp >= 0 && hpRatio < t.lastHp - 0.001) {
+      t.hitT = 0.3;
+      if (kind.startsWith('building')) this.onBuildingHit(x, y);
+    }
+    t.lastHp = hpRatio;
     updateHpBar(t.hpBar!, hpRatio);
     return t;
   }
@@ -287,7 +298,7 @@ export class World {
       from: new THREE.Vector3(x, 0, y), to: new THREE.Vector3(x, 0, y),
       hpBar, animT: (id % 31) * 0.21, attackT: 0, deadT: 0, recoilT: 0,
       heading: 0, targetHeading: 0, turnRate: 0, stepSign: 1,
-      toolT: 0, toolKind: null,
+      toolT: 0, toolKind: null, hitT: 0, lastHp: -1,
     };
     this.tracked.set(id, t);
     return t;
@@ -509,7 +520,30 @@ export class World {
     t.obj.position.y += (targetY - t.obj.position.y) * Math.min(1, dt * 10);
   }
 
+  /** Red damage flash on body+head, restoring original emissive afterwards. */
+  private applyHitFlash(t: Tracked, dt: number): void {
+    if (t.hitT <= 0) return;
+    t.hitT = Math.max(0, t.hitT - dt);
+    const u = t.obj.userData;
+    const parts = [u.body, u.head].filter(Boolean) as THREE.Mesh[];
+    for (const m of parts) {
+      const mat = m.material as THREE.MeshLambertMaterial;
+      if (m.userData.origEmissive === undefined) {
+        m.userData.origEmissive = mat.emissive.getHex();
+        m.userData.origEmissiveI = mat.emissiveIntensity;
+      }
+      if (t.hitT > 0) {
+        mat.emissive.setHex(0xff4433);
+        mat.emissiveIntensity = t.hitT * 2.5;
+      } else {
+        mat.emissive.setHex(m.userData.origEmissive as number);
+        mat.emissiveIntensity = m.userData.origEmissiveI as number;
+      }
+    }
+  }
+
   private animateCharacter(t: Tracked, moving: boolean, dt: number): void {
+    this.applyHitFlash(t, dt);
     const u = t.obj.userData;
     const legs = u.legs as THREE.Mesh[] | undefined;
     const arms = u.arms as THREE.Mesh[] | undefined;
@@ -617,6 +651,15 @@ export class World {
 
   private animateBuilding(t: Tracked, dt: number): void {
     const u = t.obj.userData;
+    // impact shudder: quick decaying wobble when the structure takes a hit
+    if (t.hitT > 0) {
+      t.hitT = Math.max(0, t.hitT - dt);
+      t.obj.rotation.z = Math.sin(t.hitT * 55) * 0.045 * t.hitT;
+      t.obj.position.y = Math.sin(t.hitT * 70) * 0.03 * t.hitT;
+    } else if (t.obj.rotation.z !== 0) {
+      t.obj.rotation.z = 0;
+      t.obj.position.y = 0;
+    }
     const turret = u.turret as THREE.Object3D | undefined;
     if (turret && t.recoilT > 0) {
       t.recoilT = Math.max(0, t.recoilT - dt * 5);

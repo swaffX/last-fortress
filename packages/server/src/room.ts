@@ -318,7 +318,7 @@ export class Room {
       const p = this.sim!.state.players.get(seat.playerId);
       if (!p) continue;
       out.push({ id: p.id, klass: p.klass, pos: p.pos, hp: p.hp, maxHp: p.maxHp,
-                 alive: p.alive, name: seat.profile.name });
+                 alive: p.alive, name: seat.profile.name, combatLevel: p.combatLevel });
     }
     return out;
   }
@@ -371,7 +371,7 @@ function validCommand(cmd: Command): boolean {
   switch (cmd.kind) {
     case 'move': case 'attack':
       return isFiniteVec(cmd.dir);
-    case 'gather':
+    case 'gather': case 'upgrade_combat':
       return true;
     case 'build':
       return typeof cmd.type === 'string' && cmd.type in BUILDINGS && isFiniteVec(cmd.pos);

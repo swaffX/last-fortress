@@ -1,5 +1,5 @@
 export const SHARED_VERSION = '0.1.0';
-export { Sim } from './sim/sim';
+export { Sim, combatUpgradeCost, combatDmgMul, combatSpeedMul } from './sim/sim';
 export { Rng } from './sim/rng';
 export { Grid } from './sim/grid';
 export { generateMap, type MapData } from './sim/mapgen';

@@ -36,6 +36,20 @@ const GATHER_RANGE = 2.8;
 /** tool tier → resources per swing */
 const TOOL_YIELD = [0, 4, 7, 11];
 
+/**
+ * Strike upgrades: each level +8% damage; every 5th level additionally
+ * +6% attack speed — steady growth with milestone spikes.
+ */
+export function combatUpgradeCost(level: number): number {
+  return 15 + level * 10;
+}
+export function combatDmgMul(level: number): number {
+  return 1 + level * 0.08;
+}
+export function combatSpeedMul(level: number): number {
+  return 1 + Math.floor(level / 5) * 0.06;
+}
+
 export class Sim {
   readonly state: SimState;
   readonly grid: Grid;
@@ -90,6 +104,7 @@ export class Sim {
       attackCooldown: 0, alive: true, respawnTicks: 0,
       mods: applySkills(skills),
       axeTier: tools.axe, pickTier: tools.pick, gatherCooldown: 0, gatherTarget: null,
+      combatLevel: 0,
     };
     this.state.players.set(id, p);
     return p;
@@ -121,6 +136,14 @@ export class Sim {
           if (d <= bd) { bd = d; best = n; }
         }
         if (best) p.gatherTarget = best.id;
+        break;
+      }
+      case 'upgrade_combat': {
+        const cost = combatUpgradeCost(p.combatLevel);
+        if (this.state.resources.gold >= cost) {
+          this.state.resources.gold -= cost;
+          p.combatLevel++;
+        }
         break;
       }
       case 'build': this.buildQueue.push({ playerId, type: cmd.type, pos: cmd.pos }); break;
@@ -497,13 +520,15 @@ export class Sim {
       if (!p.alive || p.attackCooldown > 0) continue;
       const w = WEAPON_STATS[p.weapon];
       // class passives: knight +25% melee dmg, hunter +20% ranged range
-      let dmg = w.dmg * p.mods.playerDmgMul * this.state.bonuses.playerDmgMul;
+      let dmg = w.dmg * p.mods.playerDmgMul * this.state.bonuses.playerDmgMul
+        * combatDmgMul(p.combatLevel);
       if (p.klass === 'knight' && p.weapon === 'sword') dmg *= 1.25;
       let range = w.range;
       if (p.klass === 'hunter' && p.weapon !== 'sword') range *= 1.2;
       const target = nearestEnemy(this.state.enemies.values(), p.pos, range);
       if (!target) continue;
-      p.attackCooldown = Math.round(w.cooldown / p.mods.playerAttackSpeedMul);
+      p.attackCooldown = Math.round(w.cooldown /
+        (p.mods.playerAttackSpeedMul * combatSpeedMul(p.combatLevel)));
       const crit = this.rng.next() < p.mods.critChance;
       if (crit) dmg *= 2;
       if (p.weapon !== 'sword') {

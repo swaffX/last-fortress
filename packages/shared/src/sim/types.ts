@@ -57,6 +57,7 @@ export interface Player {
   pickTier: number;        // 1..3 — stone yield
   gatherCooldown: number;  // separate from combat so E always responds
   gatherTarget: EntityId | null;   // channeling: keeps swinging until done or moved
+  combatLevel: number;             // per-match strike upgrades bought with gold
 }
 
 export interface ResourceNode {
@@ -117,6 +118,7 @@ export type Command =
   | { kind: 'move'; dir: Vec2 }                                  // dir normalized client-side; re-normalized in sim
   | { kind: 'attack'; dir: Vec2 }                                // legacy no-op (combat is automatic)
   | { kind: 'gather' }                                           // E key: harvest nearest node in reach
+  | { kind: 'upgrade_combat' }                                   // strike upgrade, costs team gold
   | { kind: 'build'; type: BuildingType; pos: Vec2 }
   | { kind: 'upgrade'; buildingId: EntityId }
   | { kind: 'demolish'; buildingId: EntityId };

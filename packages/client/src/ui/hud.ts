@@ -1,5 +1,6 @@
 import {
   BUILDINGS, MAP_SIZE, riverParams, riverYAt, RIVER_WIDTH, BRIDGE_XS, CASTLE_POS,
+  combatUpgradeCost,
   type BuildingType, type Resources, type Phase, type SimEvent,
 } from '@lf/shared';
 import type { UpgradeDef } from '@lf/shared';
@@ -31,7 +32,11 @@ function costStr(type: BuildingType): string {
   return parts.join(' ');
 }
 
-/** crafting cost labels per current tier (mirrors the server table) */
+/** crafting costs + labels per current tier (mirrors the server table) */
+const TOOL_COSTS: Record<'axe' | 'pick', Record<number, { w: number; s: number } | null>> = {
+  axe: { 1: { w: 60, s: 20 }, 2: { w: 150, s: 80 }, 3: null },
+  pick: { 1: { w: 40, s: 30 }, 2: { w: 100, s: 90 }, 3: null },
+};
 const TOOL_COST_LABEL: Record<'axe' | 'pick', Record<number, string>> = {
   axe: { 1: '▲ 60W 20S', 2: '▲ 150W 80S', 3: 'MAX' },
   pick: { 1: '▲ 40W 30S', 2: '▲ 100W 90S', 3: 'MAX' },
@@ -82,6 +87,9 @@ export class Hud {
         <button class="build-slot" id="inv-pick">
           <span class="ico">⛏</span><span class="nm">Pick <b id="pick-tier">I</b></span><span class="cost" id="pick-cost"></span>
         </button>
+        <button class="build-slot" id="inv-strike">
+          <span class="ico">⚔️</span><span class="nm">Strike <b id="strike-lv">0</b></span><span class="cost" id="strike-cost"></span>
+        </button>
       </div>
       <div class="build-menu hidden" id="build-menu">
         <div class="bm-title">Construction</div>
@@ -114,10 +122,32 @@ export class Hud {
     (this.q('#inv-hammer')).onclick = () => this.toggleBuildMenu();
     (this.q('#inv-axe')).onclick = () => this.onToolUpgrade('axe');
     (this.q('#inv-pick')).onclick = () => this.onToolUpgrade('pick');
+    (this.q('#inv-strike')).onclick = () => this.onCombatUpgrade();
     this.mini = (this.q('#minimap') as HTMLCanvasElement).getContext('2d')!;
   }
 
   onToolUpgrade: (tool: 'axe' | 'pick') => void = () => {};
+  onCombatUpgrade: () => void = () => {};
+
+  /** Tiny celebratory popup pinned above an inventory slot. */
+  slotPopup(slotId: string, text: string): void {
+    const slot = this.q(`#${slotId}`);
+    const rect = slot.getBoundingClientRect();
+    const el = document.createElement('div');
+    el.className = 'slot-popup';
+    el.textContent = text;
+    el.style.left = `${rect.left + rect.width / 2}px`;
+    el.style.top = `${rect.top - 8}px`;
+    this.root.appendChild(el);
+    setTimeout(() => el.remove(), 1600);
+  }
+
+  setCombat(level: number, gold: number, cost: number): void {
+    this.q('#strike-lv').textContent = String(level);
+    const milestone = (level + 1) % 5 === 0 ? ' ★' : '';
+    this.q('#strike-cost').textContent = `▲ ${cost}G${milestone}`;
+    this.q('#inv-strike').classList.toggle('poor', gold < cost);
+  }
 
   toggleBuildMenu(open?: boolean): void {
     const el = this.q('#build-menu');
@@ -126,8 +156,11 @@ export class Hud {
   }
   get buildMenuOpen(): boolean { return !this.q('#build-menu').classList.contains('hidden'); }
 
+  private lastTools = { axe: 1, pick: 1 };
+
   /** Refresh tool tiers + crafting costs on the inventory bar. */
   setTools(tools: { axe: number; pick: number }): void {
+    this.lastTools = { ...tools };
     const roman = ['', 'I', 'II', 'III'];
     this.q('#axe-tier').textContent = roman[tools.axe] ?? 'III';
     this.q('#pick-tier').textContent = roman[tools.pick] ?? 'III';
@@ -221,6 +254,15 @@ export class Hud {
         && (c.gold ?? 0) <= res.gold && (c.coins ?? 0) <= res.coins;
       el.classList.toggle('poor', !afford);
     }
+
+    // inventory affordability: tools (wood/stone) and strike (gold)
+    for (const tool of ['axe', 'pick'] as const) {
+      const cost = TOOL_COSTS[tool][Math.min(3, this.lastTools[tool])];
+      this.q(`#inv-${tool}`).classList.toggle('poor',
+        !cost || res.wood < cost.w || res.stone < cost.s);
+    }
+    const self = players.find(p => p.id === selfId);
+    if (self) this.setCombat(self.combatLevel, res.gold, combatUpgradeCost(self.combatLevel));
 
     // party panel
     const panel = this.q('#party-panel');

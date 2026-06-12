@@ -317,6 +317,22 @@ button { font-family: inherit; cursor: pointer; }
 .restart-row { display: flex; gap: 14px; }
 .restart-votes { color: var(--gold); font-weight: 700; letter-spacing: 0.1em; }
 
+/* inventory slot popup */
+.slot-popup {
+  position: fixed; transform: translate(-50%, -100%);
+  padding: 5px 12px; background: var(--night-1); clip-path: var(--chamfer-sm);
+  border: 1px solid var(--gold); color: var(--gold); font-weight: 800;
+  font-size: 0.78rem; z-index: 40; pointer-events: none;
+  animation: popup-rise 1.6s ease-out both;
+}
+@keyframes popup-rise {
+  0% { opacity: 0; transform: translate(-50%, -90%) scale(0.8); }
+  15% { opacity: 1; transform: translate(-50%, -110%) scale(1.05); }
+  25% { transform: translate(-50%, -110%) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -160%); }
+}
+
 /* perf counter */
 .perf-panel {
   position: absolute; top: 14px; right: 14px; padding: 5px 12px;
@@ -400,13 +416,17 @@ button { font-family: inherit; cursor: pointer; }
 .choice-card .ds { font-size: 0.78rem; color: var(--steel); line-height: 1.35; }
 .choice-card .vt { margin-top: 8px; min-height: 1.2em; font-size: 1rem; }
 
-/* floating selection panel — anchored above the selected building */
+/* floating selection panel — anchored above the selected building.
+   The card body lets clicks fall through to the world (so you can select a
+   neighbouring wall straight through it); only the buttons catch clicks. */
 .sel-panel {
   position: absolute; width: 168px; padding: 10px 12px;
   transform: translate(-50%, calc(-100% - 14px));
   background: rgba(13, 20, 32, 0.94); clip-path: var(--chamfer-sm);
   border: 1px solid var(--night-3); z-index: 25;
+  pointer-events: none;
 }
+.sel-panel .btn { pointer-events: auto; }
 .sel-panel .nm { font-family: var(--font-display); font-size: 0.8rem; letter-spacing: 0.06em; }
 .sel-panel .tier { color: var(--ember); font-size: 0.62rem; letter-spacing: 0.18em; text-transform: uppercase; display: inline; }
 .sel-panel .hp { font-size: 0.68rem; color: var(--steel); margin: 3px 0 6px; display: inline; float: right; }
