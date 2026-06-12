@@ -286,11 +286,14 @@ export class Hud {
   handleEvents(events: SimEvent[], project: (x: number, y: number) => { x: number; y: number } | null): void {
     const layer = this.q('#dmg-layer');
     for (const e of events) {
-      if (e.kind === 'damage' || e.kind === 'coins') {
+      if (e.kind === 'damage' || e.kind === 'coins' || e.kind === 'gather') {
         const pt = project(e.pos.x, e.pos.y);
         if (!pt) continue;
         const el = document.createElement('div');
-        if (e.kind === 'coins') {
+        if (e.kind === 'gather') {
+          el.className = 'dmg-num gather';
+          el.textContent = `+${e.amount} ${e.resource === 'wood' ? '🪵' : '🧱'}`;
+        } else if (e.kind === 'coins') {
           el.className = 'dmg-num coins';
           el.textContent = `+${e.amount}`;
         } else {

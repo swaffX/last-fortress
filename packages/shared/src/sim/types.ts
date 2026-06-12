@@ -123,6 +123,7 @@ export type SimEvent =
   | { kind: 'melee'; pos: Vec2 }
   | { kind: 'splash'; pos: Vec2 }
   | { kind: 'node_depleted'; nodeId: EntityId; pos: Vec2 }
+  | { kind: 'gather'; pos: Vec2; resource: 'wood' | 'stone'; amount: number }
   | { kind: 'explosion'; pos: Vec2; radius: number }
   | { kind: 'chain'; points: Vec2[] }
   | { kind: 'death'; pos: Vec2; enemy: EnemyType }

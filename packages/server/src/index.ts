@@ -85,7 +85,7 @@ async function main() {
         case 'restart_vote': conn.room?.handleRestartVote(ws); break;
         case 'chat': conn.room?.handleChat(ws, msg.text); break;
         case 'latency': ws.send(encode({ t: 'latency', n: msg.n })); break;
-        case 'ghost': conn.room?.handleGhost(ws, msg.type, msg.pos); break;
+        case 'ghost': conn.room?.handleGhost(ws, msg.type, msg.pos, msg.ok); break;
         case 'unlock_skill': {
           if (!conn.profile) return;
           if (tryUnlockSkill(conn.profile, msg.skillId)) {

@@ -270,6 +270,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .dmg-num.crit { color: var(--gold); font-size: 21px; animation: dmg-crit 0.9s ease-out both; }
 .dmg-num.coins { color: var(--gold); font-size: 13px; }
+.dmg-num.gather { color: var(--verdant); font-size: 15px; font-weight: 800; }
 @keyframes dmg-float { to { transform: translateY(-46px); opacity: 0; } }
 @keyframes dmg-crit {
   0% { transform: scale(1.6); } 25% { transform: scale(1); }

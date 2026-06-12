@@ -136,10 +136,10 @@ export class Room {
 
   /** Relay a player's build-cursor ghost to teammates. */
   handleGhost(ws: WebSocket, type: import('@lf/shared').BuildingType | null,
-              pos: { x: number; y: number }): void {
+              pos: { x: number; y: number }, ok: boolean): void {
     const seat = this.seats.find(s => s.ws === ws);
     if (!seat) return;
-    const msg = encode({ t: 'ghost', from: seat.profile.name, type, pos });
+    const msg = encode({ t: 'ghost', from: seat.profile.name, type, pos, ok });
     for (const other of this.seats) {
       if (other !== seat && other.ws && other.ws.readyState === other.ws.OPEN) other.ws.send(msg);
     }

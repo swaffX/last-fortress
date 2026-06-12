@@ -16,7 +16,7 @@ export type ClientMsg =
   | { t: 'restart_vote' }                                        // game-over: try again
   | { t: 'chat'; text: string }
   | { t: 'latency'; n: number }                                  // echoed back for RTT
-  | { t: 'ghost'; type: BuildingType | null; pos: Vec2 }         // build cursor shared with team
+  | { t: 'ghost'; type: BuildingType | null; pos: Vec2; ok: boolean }  // build cursor shared with team
   | { t: 'leave' };
 
 export interface BuildingView {
@@ -53,7 +53,7 @@ export type ServerMsg =
   | { t: 'lobby_closed' }
   | { t: 'chat'; from: string; text: string }
   | { t: 'latency'; n: number }
-  | { t: 'ghost'; from: string; type: BuildingType | null; pos: Vec2 }
+  | { t: 'ghost'; from: string; type: BuildingType | null; pos: Vec2; ok: boolean }
   | { t: 'error'; message: string };
 
 export interface ProfileView {

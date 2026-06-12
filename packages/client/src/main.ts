@@ -136,7 +136,7 @@ net.on((msg: ServerMsg) => {
       lastPing = Math.round(performance.now() - msg.n);
       break;
     case 'ghost':
-      world.setRemoteGhost(msg.type, msg.pos);
+      world.setRemoteGhost(msg.type, msg.pos, msg.ok);
       break;
     case 'choice_offer':
       hud.showChoice(msg.options);
@@ -197,10 +197,10 @@ setInterval(() => {
   if (!inGame) return;
   const type = input.activeType;
   const cell = input.ghostCell ?? { x: 0, y: 0 };
-  const key = type ? `${type}:${cell.x},${cell.y}` : 'null';
+  const key = type ? `${type}:${cell.x},${cell.y}:${input.ghostOk}` : 'null';
   if (key === lastGhostSent) return;
   lastGhostSent = key;
-  net.send({ t: 'ghost', type, pos: cell });
+  net.send({ t: 'ghost', type, pos: cell, ok: input.ghostOk });
 }, 120);
 
 addEventListener('keydown', e => {

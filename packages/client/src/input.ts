@@ -24,6 +24,7 @@ export class Input {
   private ghostIconOk: boolean | null = null;
   /** last hovered cell while in build mode — shared with teammates */
   ghostCell: { x: number; y: number } | null = null;
+  ghostOk = false;
   get activeType(): BuildingType | null { return this.buildType; }
 
   send: (cmd: Command) => void = () => {};
@@ -44,13 +45,15 @@ export class Input {
     });
     addEventListener('keyup', e => this.keys.delete(e.key.toLowerCase()));
     addEventListener('blur', () => this.keys.clear());
-    canvas.addEventListener('pointermove', e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
-    canvas.addEventListener('contextmenu', e => {
-      e.preventDefault();
+    // window-level listeners: overlays can never swallow world input.
+    // UI clicks are filtered out by target instead.
+    addEventListener('pointermove', e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
+    addEventListener('contextmenu', e => {
+      if (!isUiTarget(e.target)) e.preventDefault();
       if (this.buildType) this.onBuildCancel();   // right-click exits build mode
     });
-    canvas.addEventListener('pointerdown', e => {
-      if (e.button !== 0) return;
+    addEventListener('pointerdown', e => {
+      if (e.button !== 0 || isUiTarget(e.target)) return;
       const w = this.stage.screenToWorld(e.clientX, e.clientY);
       if (e.altKey) { this.ping(w); return; }
       if (this.buildType) {
@@ -235,6 +238,7 @@ export class Input {
     this.ghost.position.set(cell.x + size / 2, 0, cell.y + size / 2);
     this.ghostCell = cell;
     const ok = this.isValid(cell, size);
+    this.ghostOk = ok;
     (this.ghostPlate!.material as THREE.MeshBasicMaterial).color.setHex(ok ? 0x6fbf63 : 0xc43a31);
     if (this.ghostIcon && ok !== this.ghostIconOk) {
       this.ghostIconOk = ok;
@@ -246,6 +250,12 @@ export class Input {
     if (this.keys.has(key)) { this.keys.delete(key); return true; }
     return false;
   }
+}
+
+/** true when the event landed on interactive UI rather than the game world */
+function isUiTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement &&
+    target.closest('button, input, a, .overlay, .choice-overlay, .sel-panel, .minimap, .build-bar, .screen, .chat-input') !== null;
 }
 
 function makeGhostIcon(): THREE.Sprite {

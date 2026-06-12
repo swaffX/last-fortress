@@ -281,6 +281,10 @@ export class Sim {
       best.node.amount -= take;
       const kind = best.node.kind === 'tree' ? 'wood' : 'stone';
       this.state.resources[kind] += take;
+      events.push({
+        kind: 'gather', resource: kind, amount: take,
+        pos: { x: best.node.pos.x + 0.5, y: best.node.pos.y + 0.5 },
+      });
       if (best.node.amount <= 0) {
         this.grid.clear(best.node.pos, 1);
         this.state.nodes.delete(best.node.id);

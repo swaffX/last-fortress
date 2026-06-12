@@ -53,33 +53,45 @@ export class World {
   /** Fired once per stride of any walking player (footprints, dust, sfx). */
   onStep: (x: number, z: number, heading: number, side: -1 | 1, isSelf: boolean) => void = () => {};
 
-  // ---- teammate's build cursor, rendered as a translucent blue preview ----
+  // ---- teammate's build cursor: same green/red preview you see yourself ----
   private remoteGhost: THREE.Group | null = null;
   private remoteGhostKind: string | null = null;
+  private remoteGhostPlate: THREE.Mesh | null = null;
 
-  setRemoteGhost(type: string | null, pos: { x: number; y: number }): void {
+  setRemoteGhost(type: string | null, pos: { x: number; y: number }, ok: boolean): void {
     if (!type) {
-      if (this.remoteGhost) { this.scene.remove(this.remoteGhost); this.remoteGhost = null; this.remoteGhostKind = null; }
+      if (this.remoteGhost) {
+        this.scene.remove(this.remoteGhost);
+        this.remoteGhost = null; this.remoteGhostKind = null; this.remoteGhostPlate = null;
+      }
       return;
     }
+    const size = BUILDINGS[type as keyof typeof BUILDINGS].size;
     if (this.remoteGhostKind !== type) {
       if (this.remoteGhost) this.scene.remove(this.remoteGhost);
       const model = buildingModel(type as Parameters<typeof buildingModel>[0], 1);
       model.traverse(o => {
         if (o instanceof THREE.Mesh) {
           const m = (o.material as THREE.MeshLambertMaterial).clone();
-          m.transparent = true; m.opacity = 0.4;
-          m.color.lerp(new THREE.Color(0x6db8d8), 0.5);   // teammate tint
+          m.transparent = true; m.opacity = 0.45;
           o.material = m;
           o.castShadow = false;
         }
       });
-      this.remoteGhost = model;
+      this.remoteGhostPlate = new THREE.Mesh(
+        new THREE.PlaneGeometry(size, size),
+        new THREE.MeshBasicMaterial({ color: 0x6fbf63, transparent: true, opacity: 0.35, depthWrite: false }));
+      this.remoteGhostPlate.rotation.x = -Math.PI / 2;
+      this.remoteGhostPlate.position.y = 0.04;
+      const g = new THREE.Group();
+      g.add(model, this.remoteGhostPlate);
+      this.remoteGhost = g;
       this.remoteGhostKind = type;
-      this.scene.add(model);
+      this.scene.add(g);
     }
-    const size = BUILDINGS[type as keyof typeof BUILDINGS].size;
     this.remoteGhost!.position.set(pos.x + size / 2, 0, pos.y + size / 2);
+    (this.remoteGhostPlate!.material as THREE.MeshBasicMaterial)
+      .color.setHex(ok ? 0x6fbf63 : 0xc43a31);
   }
 
   private isSolidAt(x: number, y: number): boolean {
