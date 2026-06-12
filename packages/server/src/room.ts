@@ -11,7 +11,13 @@ import type { Profile, ProfileStore } from './db';
 
 const MAX_PLAYERS = 2;
 const RECONNECT_MS = 60_000;
-const MAX_CMDS_PER_TICK = 16;
+const MAX_CMDS_PER_TICK = 24;   // hold-to-gather sends every input tick
+
+/** crafting costs per target tier */
+const TOOL_COSTS: Record<'axe' | 'pick', Record<number, { wood: number; stone: number } | undefined>> = {
+  axe: { 2: { wood: 60, stone: 20 }, 3: { wood: 150, stone: 80 } },
+  pick: { 2: { wood: 40, stone: 30 }, 3: { wood: 100, stone: 90 } },
+};
 
 interface Seat {
   deviceId: string;
@@ -123,14 +129,17 @@ export class Room {
     this.broadcast({ t: 'ping', pos, from: seat.profile.name });
   }
 
-  /** Tool upgrades are paid from the team coin pool, persist on the profile. */
+  /** Tool upgrades cost raw materials (crafting), persist on the profile. */
   handleToolUpgrade(ws: WebSocket, tool: 'axe' | 'pick'): { profile: Profile } | null {
     const seat = this.seats.find(s => s.ws === ws);
     if (!seat || !this.sim || this.state !== 'playing') return null;
     const tier = seat.profile.tools[tool];
-    const cost = tier === 1 ? 50 : tier === 2 ? 150 : null;
-    if (cost === null || this.sim.state.resources.coins < cost) return null;
-    this.sim.state.resources.coins -= cost;
+    const cost = TOOL_COSTS[tool][tier + 1];
+    if (!cost) return null;
+    const res = this.sim.state.resources;
+    if (res.wood < cost.wood || res.stone < cost.stone) return null;
+    res.wood -= cost.wood;
+    res.stone -= cost.stone;
     seat.profile.tools[tool] = tier + 1;
     if (seat.playerId !== null) this.sim.setPlayerTool(seat.playerId, tool, tier + 1);
     void this.store.save(seat.profile);

@@ -110,7 +110,7 @@ net.on((msg: ServerMsg) => {
       for (const e of msg.events) {
         if (e.kind === 'projectile') world.aimTower(e.from, e.to);
         if (e.kind === 'melee') world.lungePlayerAt(e.pos.x, e.pos.y);
-        if (e.kind === 'gather') world.lungePlayerAt(e.pos.x, e.pos.y);
+        if (e.kind === 'gather') world.gatherSwing(e.pos.x, e.pos.y, e.resource);
         if (e.kind === 'node_depleted') {
           world.removeNode(e.nodeId);
           lastNodes = lastNodes.filter(n => n.id !== e.nodeId);
@@ -216,11 +216,6 @@ addEventListener('keydown', e => {
   }
   if (e.key === 'Enter') { hud.openChat(); e.preventDefault(); return; }
   if (e.target instanceof HTMLInputElement) return;
-  const n = Number(e.key);
-  if (n >= 1 && n <= 9) hud.buildByIndex(n - 1);
-  if (e.key.toLowerCase() === 'e') {
-    net.send({ t: 'cmd', cmd: { kind: 'gather' } });
-  }
   if (e.key.toLowerCase() === 'b') hud.toggleBuildMenu();
   if (e.key === 'Escape') { hud.clearBuild(); hud.selectBuilding(null); hud.toggleBuildMenu(false); }
   if (e.key.toLowerCase() === 'k' && profile) screens.skillTree(profile, true);

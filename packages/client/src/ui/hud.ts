@@ -31,7 +31,11 @@ function costStr(type: BuildingType): string {
   return parts.join(' ');
 }
 
-const TOOL_UPGRADE_COST: Record<number, number | null> = { 1: 50, 2: 150, 3: null };
+/** crafting cost labels per current tier (mirrors the server table) */
+const TOOL_COST_LABEL: Record<'axe' | 'pick', Record<number, string>> = {
+  axe: { 1: '▲ 60W 20S', 2: '▲ 150W 80S', 3: 'MAX' },
+  pick: { 1: '▲ 40W 30S', 2: '▲ 100W 90S', 3: 'MAX' },
+};
 
 export class Hud {
   private root: HTMLElement;
@@ -122,15 +126,13 @@ export class Hud {
   }
   get buildMenuOpen(): boolean { return !this.q('#build-menu').classList.contains('hidden'); }
 
-  /** Refresh tool tiers + upgrade costs on the inventory bar. */
+  /** Refresh tool tiers + crafting costs on the inventory bar. */
   setTools(tools: { axe: number; pick: number }): void {
     const roman = ['', 'I', 'II', 'III'];
     this.q('#axe-tier').textContent = roman[tools.axe] ?? 'III';
     this.q('#pick-tier').textContent = roman[tools.pick] ?? 'III';
-    const ac = TOOL_UPGRADE_COST[tools.axe];
-    const pc = TOOL_UPGRADE_COST[tools.pick];
-    this.q('#axe-cost').textContent = ac ? `▲ ${ac}C` : 'MAX';
-    this.q('#pick-cost').textContent = pc ? `▲ ${pc}C` : 'MAX';
+    this.q('#axe-cost').textContent = TOOL_COST_LABEL.axe[Math.min(3, tools.axe)]!;
+    this.q('#pick-cost').textContent = TOOL_COST_LABEL.pick[Math.min(3, tools.pick)]!;
   }
 
   private q(sel: string): HTMLElement { return this.root.querySelector(sel)!; }

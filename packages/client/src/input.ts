@@ -214,6 +214,8 @@ export class Input {
   tick(): void {
     const { x: dx, y: dy } = this.dir;
     if (dx || dy) this.send({ kind: 'move', dir: { x: dx, y: dy } });
+    // hold E to keep chopping/mining — the server's gather cooldown paces it
+    if (this.keys.has('e')) this.send({ kind: 'gather' });
     if (this.keys.has('r') && this.ghost) {
       this.ghostRot += Math.PI / 2;
       this.ghost.children[0]!.rotation.y = this.ghostRot;

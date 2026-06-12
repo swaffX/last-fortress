@@ -5,7 +5,7 @@ import {
 } from '@lf/shared';
 import type { BuildingView, EnemyView, PlayerView, NodeView, ProjectileView } from '../net';
 import {
-  buildingModel, enemyModel, playerModel, treeModel, rockModel, projectileModel,
+  buildingModel, enemyModel, playerModel, treeModel, rockModel, projectileModel, toolModel,
 } from './models';
 
 interface Tracked {
@@ -22,6 +22,8 @@ interface Tracked {
   targetHeading: number;   // where the entity wants to face
   turnRate: number;        // smoothed angular velocity — drives banking lean
   stepSign: number;        // walk-cycle phase sign, flips on each stride
+  toolT: number;           // >0 while a gathering tool is in hand
+  toolKind: 'axe' | 'pick' | null;
 }
 
 /** shortest-path angular damp: eases rotation instead of snapping */
@@ -275,6 +277,7 @@ export class World {
       from: new THREE.Vector3(x, 0, y), to: new THREE.Vector3(x, 0, y),
       hpBar, animT: (id % 31) * 0.21, attackT: 0, deadT: 0, recoilT: 0,
       heading: 0, targetHeading: 0, turnRate: 0, stepSign: 1,
+      toolT: 0, toolKind: null,
     };
     this.tracked.set(id, t);
     return t;
@@ -350,6 +353,25 @@ export class World {
       if (d < bd) { bd = d; best = t; }
     }
     if (best && best.attackT <= 0) best.attackT = 1;
+  }
+
+  /**
+   * Gathering swing: the nearest player faces the node, the weapon is
+   * swapped for an axe/pickaxe in the right hand, and an overhead chop plays.
+   */
+  gatherSwing(x: number, y: number, resource: 'wood' | 'stone'): void {
+    let best: Tracked | null = null;
+    let bd = 3.4;
+    for (const [, t] of this.tracked) {
+      if (!t.kind.startsWith('player:')) continue;
+      const d = Math.hypot(t.obj.position.x - x, t.obj.position.z - y);
+      if (d < bd) { bd = d; best = t; }
+    }
+    if (!best) return;
+    best.toolKind = resource === 'wood' ? 'axe' : 'pick';
+    best.toolT = 0.55;
+    best.attackT = 1;                       // reuse the chop arc
+    best.targetHeading = Math.atan2(x - best.obj.position.x, y - best.obj.position.z);
   }
 
   /** dt-based interpolation + prediction + procedural animation. */
@@ -511,6 +533,32 @@ export class World {
       }
       // zombies standing still are attacking something — periodic lunge
       if (isZombie && t.attackT <= 0 && Math.random() < dt * 1.2) t.attackT = 1;
+    }
+
+    // gathering tool: hide the weapon, show axe/pick in the right hand
+    if (t.toolT > 0) {
+      t.toolT = Math.max(0, t.toolT - dt);
+      const armR = arms[1]!;
+      let tool = armR.userData[`tool_${t.toolKind}`] as THREE.Group | undefined;
+      if (!tool && t.toolKind) {
+        tool = toolModel(t.toolKind);
+        armR.add(tool);
+        armR.userData[`tool_${t.toolKind}`] = tool;
+      }
+      const weapon = u.weaponParts as THREE.Object3D[] | undefined;
+      if (weapon) for (const w of weapon) w.visible = false;
+      for (const k of ['axe', 'pick'] as const) {
+        const tm = armR.userData[`tool_${k}`] as THREE.Group | undefined;
+        if (tm) tm.visible = k === t.toolKind;
+      }
+    } else {
+      const armR = arms[1]!;
+      const weapon = u.weaponParts as THREE.Object3D[] | undefined;
+      if (weapon) for (const w of weapon) w.visible = true;
+      for (const k of ['axe', 'pick'] as const) {
+        const tm = armR.userData[`tool_${k}`] as THREE.Group | undefined;
+        if (tm) tm.visible = false;
+      }
     }
 
     // attack lunge: arms slam down, body pitches into the strike

@@ -586,6 +586,7 @@ export function playerModel(klass: ClassType): THREE.Group {
   armR.add(at(box(0.18, 0.16, 0.18, armorDark), 0, -0.42, 0));
 
   const extras: THREE.Object3D[] = [];
+  const weaponParts: THREE.Object3D[] = [];
   if (knight) {
     // longsword: tapered blade, glinting edge, crossguard, wrapped grip, pommel
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.95, 0.035), mat(0xd5dde6));
@@ -596,6 +597,7 @@ export function playerModel(klass: ClassType): THREE.Group {
     const grip = box(0.06, 0.18, 0.06, 0x3a3028, -0.32);
     const pommel = at(new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), mat(trim)), 0, -0.2, 0);
     armR.add(blade, tip, guard, grip, pommel);
+    weaponParts.push(blade, tip, guard, grip, pommel);
     // heater shield: two-tone field + gold boss + trim
     const shield = box(0.07, 0.62, 0.46, 0x6a7a94, -0.32);
     shield.position.x = -0.1;
@@ -616,6 +618,7 @@ export function playerModel(klass: ClassType): THREE.Group {
     arrow.add(at(cone(0.03, 0.08, 0x9aa3ab, 0, 4), 0, 0, 0.28));
     arrow.children[0]!.rotation.x = Math.PI / 2;
     armR.add(bow, string, arrow);
+    weaponParts.push(bow, string, arrow);
     // quiver with fletched arrows
     const quiver = cyl(0.09, 0.1, 0.48, 0x7a3328, 0);
     quiver.position.set(0.14, 0.98, -0.28);
@@ -648,6 +651,32 @@ export function playerModel(klass: ClassType): THREE.Group {
   g.userData.body = body;
   g.userData.head = head;
   g.userData.flags = [capeOuter, capeInnerMesh];
+  g.userData.weaponParts = weaponParts;   // hidden while a tool is in hand
+  return g;
+}
+
+/** Hand tools shown while gathering — attached to the right arm. */
+export function toolModel(kind: 'axe' | 'pick'): THREE.Group {
+  const g = new THREE.Group();
+  const handle = box(0.06, 0.7, 0.06, TRUNK, -0.5);
+  g.add(handle);
+  if (kind === 'axe') {
+    const headBlock = box(0.08, 0.16, 0.3, IRON, -0.82);
+    headBlock.position.z = 0.1;
+    const edge = box(0.06, 0.18, 0.06, 0xd5dde6, -0.82);
+    edge.position.z = 0.27;
+    g.add(headBlock, edge);
+  } else {
+    const headBar = box(0.07, 0.09, 0.55, IRON, -0.82);
+    const tipF = cone(0.05, 0.14, 0x9aa3ab, -0.82, 4);
+    tipF.rotation.x = Math.PI / 2;
+    tipF.position.z = 0.33;
+    const tipB = cone(0.05, 0.14, 0x9aa3ab, -0.82, 4);
+    tipB.rotation.x = -Math.PI / 2;
+    tipB.position.z = -0.33;
+    g.add(headBar, tipF, tipB);
+  }
+  g.traverse(o => { if (o instanceof THREE.Mesh) o.castShadow = true; });
   return g;
 }
 
