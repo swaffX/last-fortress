@@ -4,6 +4,7 @@ import { Net, type ServerMsg, type ProfileView, type BuildingView, type NodeView
 import { Stage } from './render/scene';
 import { World } from './render/world';
 import { Effects } from './render/effects';
+import { Environment } from './render/environment';
 import { Audio } from './audio';
 import { Hud } from './ui/hud';
 import { Screens } from './ui/screens';
@@ -20,6 +21,7 @@ const input = new Input(stage, canvas);
 const net = new Net();
 
 let profile: ProfileView | null = null;
+let env: Environment | null = null;
 let inGame = false;
 let lastFrameBuildings: BuildingView[] = [];
 let lastNodes: NodeView[] = [];
@@ -41,6 +43,7 @@ hud.onDemolish = id => {
 };
 input.send = cmd => net.send({ t: 'cmd', cmd });
 input.ping = pos => net.send({ t: 'ping', pos });
+input.onAttack = () => world.lunge(selfId);
 input.onSelectAt = cell => {
   const b = lastFrameBuildings.find(bb => {
     const s = bb.type === 'castle' ? 4 : 2;
@@ -72,6 +75,8 @@ net.on((msg: ServerMsg) => {
       lastNodes = msg.nodes;
       world.setNodes(msg.nodes);
       input.nodes = msg.nodes;
+      env?.dispose();
+      env = new Environment(stage.scene, msg.seed, msg.nodes);
       screens.clear();
       hud.show();
       hud.banner('The Watch Begins', false);
@@ -82,6 +87,9 @@ net.on((msg: ServerMsg) => {
       input.buildings = msg.buildings;
       // node depletion: drop rendered nodes the sim no longer reports via gather
       world.applyFrame(msg.players, msg.enemies, msg.buildings);
+      for (const e of msg.events) {
+        if (e.kind === 'projectile') world.aimTower(e.from, e.to);
+      }
       effects.handle(msg.events);
       audio.handle(msg.events);
       audio.setPhase(msg.phase);
@@ -135,6 +143,7 @@ function loop(now: number): void {
   last = now;
   world.render(dt);
   effects.update(dt);
+  env?.update(dt);
   input.updateGhost();
   stage.update(dt);
   requestAnimationFrame(loop);

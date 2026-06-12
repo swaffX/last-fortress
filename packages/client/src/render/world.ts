@@ -9,13 +9,18 @@ interface Tracked {
   from: THREE.Vector3;     // interpolation source
   to: THREE.Vector3;       // interpolation target
   hpBar?: THREE.Sprite;
+  animT: number;           // personal animation clock (desynced per entity)
+  attackT: number;         // >0 while playing an attack lunge
+  deadT: number;           // >0 while playing death fall (enemies removed server-side, players stay)
+  recoilT: number;         // tower recoil
 }
 
-/** Syncs server entity views into the Three scene with interpolation. */
+/** Syncs server entity views into the Three scene; runs procedural animations. */
 export class World {
   private tracked = new Map<EntityId, Tracked>();
   private nodes = new Map<EntityId, THREE.Group>();
   private lerpT = 1;
+  private time = 0;
   selfId: EntityId = -1;
 
   constructor(private scene: THREE.Scene) {}
@@ -33,35 +38,22 @@ export class World {
   }
 
   /** Called once per server frame (20 Hz). render() interpolates between frames. */
-  applyFrame(players: PlayerView[], enemies: EnemyView[], buildings: BuildingView[],
-             depletedNodeIds?: EntityId[]): void {
+  applyFrame(players: PlayerView[], enemies: EnemyView[], buildings: BuildingView[]): void {
     const seen = new Set<EntityId>();
 
     for (const p of players) {
       seen.add(p.id);
       this.upsert(p.id, `player:${p.klass}:${p.alive}`, p.pos.x, p.pos.y,
-        () => {
-          const m = playerModel(p.klass);
-          if (!p.alive) m.rotation.x = Math.PI / 2;
-          return m;
-        }, p.hp / p.maxHp);
+        () => playerModel(p.klass), p.hp / p.maxHp);
     }
     for (const e of enemies) {
       seen.add(e.id);
-      const t = this.upsert(e.id, `enemy:${e.type}:${e.enraged}`, e.pos.x, e.pos.y,
+      this.upsert(e.id, `enemy:${e.type}:${e.enraged}`, e.pos.x, e.pos.y,
         () => {
           const m = enemyModel(e.type);
           if (e.enraged) m.scale.multiplyScalar(1.15);
           return m;
         }, e.hp / e.maxHp);
-      // slowed tint
-      t.obj.traverse(o => {
-        if (o instanceof THREE.Mesh) {
-          const m = o.material as THREE.MeshLambertMaterial;
-          if (e.slowed) m.color.offsetHSL(0, 0, 0); // tint via emissive instead
-          m.emissive ??= new THREE.Color(0);
-        }
-      });
     }
     for (const b of buildings) {
       seen.add(b.id);
@@ -75,28 +67,32 @@ export class World {
     for (const [id, t] of this.tracked) {
       if (!seen.has(id)) { this.scene.remove(t.obj); this.tracked.delete(id); }
     }
-    if (depletedNodeIds) {
-      for (const id of depletedNodeIds) {
-        const g = this.nodes.get(id);
-        if (g) { this.scene.remove(g); this.nodes.delete(id); }
-      }
-    }
     this.lerpT = 0;
+  }
+
+  removeNode(id: EntityId): void {
+    const g = this.nodes.get(id);
+    if (g) { this.scene.remove(g); this.nodes.delete(id); }
   }
 
   private upsert(id: EntityId, kind: string, x: number, y: number,
                  make: () => THREE.Group, hpRatio: number, barHeight = 2): Tracked {
     let t = this.tracked.get(id);
-    if (t && t.kind !== kind) { this.scene.remove(t.obj); t = undefined; }
+    if (t && t.kind !== kind) {
+      // player death/respawn transitions reuse position but rebuild the model
+      const dyingPlayer = kind.startsWith('player:') &&
+        t.kind.endsWith(':true') && kind.endsWith(':false');
+      this.scene.remove(t.obj);
+      t = undefined;
+      if (dyingPlayer) {
+        const fresh = this.create(id, kind, x, y, make, barHeight);
+        fresh.deadT = 1;
+        updateHpBar(fresh.hpBar!, hpRatio);
+        return fresh;
+      }
+    }
     if (!t) {
-      const obj = make();
-      obj.position.set(x, 0, y);
-      const hpBar = makeHpBar();
-      hpBar.position.y = barHeight;
-      obj.add(hpBar);
-      this.scene.add(obj);
-      t = { obj, kind, from: new THREE.Vector3(x, 0, y), to: new THREE.Vector3(x, 0, y), hpBar };
-      this.tracked.set(id, t);
+      t = this.create(id, kind, x, y, make, barHeight);
     } else {
       t.from.copy(t.obj.position);
       t.to.set(x, 0, y);
@@ -105,14 +101,152 @@ export class World {
     return t;
   }
 
-  /** dt-based interpolation between the last two server frames (50 ms apart). */
-  render(dt: number): void {
-    this.lerpT = Math.min(1, this.lerpT + dt / 0.05);
+  private create(id: EntityId, kind: string, x: number, y: number,
+                 make: () => THREE.Group, barHeight: number): Tracked {
+    const obj = make();
+    obj.position.set(x, 0, y);
+    const hpBar = makeHpBar();
+    hpBar.position.y = barHeight;
+    obj.add(hpBar);
+    this.scene.add(obj);
+    const t: Tracked = {
+      obj, kind,
+      from: new THREE.Vector3(x, 0, y), to: new THREE.Vector3(x, 0, y),
+      hpBar, animT: (id % 31) * 0.21, attackT: 0, deadT: 0, recoilT: 0,
+    };
+    this.tracked.set(id, t);
+    return t;
+  }
+
+  /** Point the matching tower's turret at a target; kick recoil. Called on projectile events. */
+  aimTower(from: { x: number; y: number }, to: { x: number; y: number }): void {
+    let best: Tracked | null = null;
+    let bd = 1.6;
     for (const t of this.tracked.values()) {
+      if (!t.obj.userData.turret) continue;
+      const d = Math.hypot(t.obj.position.x - from.x, t.obj.position.z - from.y);
+      if (d < bd) { bd = d; best = t; }
+    }
+    if (!best) return;
+    const turret = best.obj.userData.turret as THREE.Object3D;
+    turret.rotation.y = Math.atan2(to.x - best.obj.position.x, to.y - best.obj.position.z);
+    best.recoilT = 1;
+  }
+
+  /** Trigger an attack lunge on a specific entity (own player on attack input). */
+  lunge(id: EntityId): void {
+    const t = this.tracked.get(id);
+    if (t && t.attackT <= 0) t.attackT = 1;
+  }
+
+  /** dt-based interpolation + procedural animation. */
+  render(dt: number): void {
+    this.time += dt;
+    this.lerpT = Math.min(1, this.lerpT + dt / 0.05);
+
+    for (const t of this.tracked.values()) {
+      const isBuilding = t.kind.startsWith('building');
+      const prev = t.obj.position.clone();
       t.obj.position.lerpVectors(t.from, t.to, this.lerpT);
-      const dx = t.to.x - t.from.x, dz = t.to.z - t.from.z;
-      if (Math.abs(dx) + Math.abs(dz) > 0.001 && !t.kind.startsWith('building')) {
-        t.obj.rotation.y = Math.atan2(dx, dz);
+
+      if (!isBuilding) {
+        const dx = t.to.x - t.from.x, dz = t.to.z - t.from.z;
+        const moving = Math.abs(dx) + Math.abs(dz) > 0.004;
+        if (moving) t.obj.rotation.y = Math.atan2(dx, dz);
+        this.animateCharacter(t, moving, dt);
+        void prev;
+      } else {
+        this.animateBuilding(t, dt);
+      }
+    }
+
+    // ambient: tree sway
+    for (const g of this.nodes.values()) {
+      const sway = g.userData.sway as THREE.Object3D[] | undefined;
+      if (!sway) continue;
+      const phase = g.position.x * 0.7 + g.position.z * 0.4;
+      for (const s of sway) {
+        s.rotation.x = Math.sin(this.time * 0.8 + phase) * 0.04;
+        s.rotation.z = Math.cos(this.time * 0.6 + phase) * 0.04;
+      }
+    }
+  }
+
+  private animateCharacter(t: Tracked, moving: boolean, dt: number): void {
+    const u = t.obj.userData;
+    const legs = u.legs as THREE.Mesh[] | undefined;
+    const arms = u.arms as THREE.Mesh[] | undefined;
+    const body = u.body as THREE.Mesh | undefined;
+    if (!legs || !arms || !body) return;
+
+    // death fall (players keep their corpse until respawn)
+    if (t.kind.startsWith('player:') && t.kind.endsWith(':false')) {
+      t.deadT = Math.max(0, t.deadT - dt * 2);
+      t.obj.rotation.x = -Math.PI / 2 * (1 - t.deadT);
+      t.obj.position.y = -0.1 * (1 - t.deadT);
+      return;
+    }
+    t.obj.rotation.x = 0;
+
+    t.animT += dt;
+    const isZombie = t.kind.startsWith('enemy');
+    const rate = moving ? (isZombie ? 7 : 10) : 1.6;
+    const swing = Math.sin(t.animT * rate);
+
+    if (moving) {
+      legs[0]!.rotation.x = swing * 0.7;
+      legs[1]!.rotation.x = -swing * 0.7;
+      const armBase = isZombie ? -0.9 : 0;
+      arms[0]!.rotation.x = armBase - swing * (isZombie ? 0.15 : 0.45);
+      arms[1]!.rotation.x = armBase + swing * (isZombie ? 0.15 : 0.45);
+      body.position.y = 0.75 + Math.abs(Math.sin(t.animT * rate)) * 0.05;
+    } else {
+      legs[0]!.rotation.x = legs[1]!.rotation.x = 0;
+      // idle breath
+      body.position.y = 0.75 + Math.sin(t.animT * 1.6) * 0.015;
+      // zombies standing still are attacking something — periodic lunge
+      if (isZombie && t.attackT <= 0 && Math.random() < dt * 1.2) t.attackT = 1;
+    }
+
+    // attack lunge: arms slam down, slight body pitch
+    if (t.attackT > 0) {
+      t.attackT = Math.max(0, t.attackT - dt * 3.5);
+      const k = Math.sin((1 - t.attackT) * Math.PI);
+      const armBase = isZombie ? -0.9 : 0;
+      arms[1]!.rotation.x = armBase - k * 1.6;
+      if (!isZombie) arms[0]!.rotation.x = 0;
+      body.rotation.x = k * 0.12;
+    } else {
+      body.rotation.x = 0;
+    }
+
+    // cape / cloth flutter
+    const flags = u.flags as THREE.Mesh[] | undefined;
+    if (flags) {
+      for (const f of flags) {
+        f.rotation.x = 0.15 + Math.sin(this.time * 3 + t.animT) * 0.08 + (moving ? 0.25 : 0);
+      }
+    }
+  }
+
+  private animateBuilding(t: Tracked, dt: number): void {
+    const u = t.obj.userData;
+    const turret = u.turret as THREE.Object3D | undefined;
+    if (turret && t.recoilT > 0) {
+      t.recoilT = Math.max(0, t.recoilT - dt * 5);
+      turret.position.z = -Math.sin(t.recoilT * Math.PI) * 0.12;
+    }
+    const spin = u.spin as THREE.Object3D[] | undefined;
+    if (spin) for (const s of spin) s.rotation.y += dt * 1.2;
+    const pulse = u.pulse as THREE.Mesh[] | undefined;
+    if (pulse) {
+      const k = 0.55 + Math.sin(this.time * 2.5 + t.animT) * 0.3;
+      for (const p of pulse) (p.material as THREE.MeshLambertMaterial).emissiveIntensity = k;
+    }
+    const flags = u.flags as THREE.Mesh[] | undefined;
+    if (flags) {
+      for (let i = 0; i < flags.length; i++) {
+        flags[i]!.rotation.y = Math.sin(this.time * 2.2 + i * 1.7) * 0.35;
       }
     }
   }

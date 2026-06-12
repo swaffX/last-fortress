@@ -18,6 +18,7 @@ export class Input {
 
   send: (cmd: Command) => void = () => {};
   ping: (pos: { x: number; y: number }) => void = () => {};
+  onAttack: () => void = () => {};
   onSelectAt: (cell: { x: number; y: number }) => void = () => {};
   buildings: BuildingView[] = [];
   nodes: NodeView[] = [];
@@ -118,6 +119,7 @@ export class Input {
     if (this.mouse.down && !this.buildType) {
       const w = this.stage.screenToWorld(this.mouse.x, this.mouse.y);
       this.send({ kind: 'attack', dir: { x: w.x, y: w.y } });
+      this.onAttack();
     }
     if (this.keys.has('r') && this.ghost) {
       this.ghostRot += Math.PI / 2;
