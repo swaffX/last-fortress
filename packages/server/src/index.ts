@@ -62,6 +62,7 @@ async function main() {
           break;
         }
         case 'create_lobby': {
+          if (conn.room && !conn.room.hasWs(ws)) conn.room = null;   // lobby dissolved earlier
           if (!conn.profile || conn.room) return;
           conn.room = lobbies.createRoom(msg.solo);
           conn.room.addPlayer(ws, conn.profile, msg.klass);
@@ -69,6 +70,7 @@ async function main() {
           break;
         }
         case 'join_lobby': {
+          if (conn.room && !conn.room.hasWs(ws)) conn.room = null;
           if (!conn.profile || conn.room) return;
           const room = lobbies.findJoinable(msg.code, conn.profile.deviceId);
           if (!room) { ws.send(encode({ t: 'error', message: 'Lobby not found or full' })); return; }
@@ -79,6 +81,8 @@ async function main() {
         case 'start_game': conn.room?.handleStart(ws); break;
         case 'cmd': conn.room?.handleCommand(ws, msg.cmd); break;
         case 'ping': conn.room?.handlePing(ws, msg.pos); break;
+        case 'vote': conn.room?.handleVote(ws, msg.option); break;
+        case 'restart_vote': conn.room?.handleRestartVote(ws); break;
         case 'unlock_skill': {
           if (!conn.profile) return;
           if (tryUnlockSkill(conn.profile, msg.skillId)) {

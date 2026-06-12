@@ -1,7 +1,9 @@
 import {
-  BUILDINGS, MAP_SIZE, type BuildingType, type Resources, type Phase, type SimEvent,
+  BUILDINGS, MAP_SIZE, riverParams, riverYAt, RIVER_WIDTH, BRIDGE_XS, CASTLE_POS,
+  type BuildingType, type Resources, type Phase, type SimEvent,
 } from '@lf/shared';
-import type { BuildingView, EnemyView, PlayerView } from '../net';
+import type { UpgradeDef } from '@lf/shared';
+import type { BuildingView, EnemyView, PlayerView, NodeView } from '../net';
 
 const BUILD_ITEMS: { type: BuildingType; ico: string; name: string }[] = [
   { type: 'wood_wall', ico: '🪵', name: 'Wall' },
@@ -31,6 +33,8 @@ function costStr(type: BuildingType): string {
 export class Hud {
   private root: HTMLElement;
   private mini!: CanvasRenderingContext2D;
+  private terrain: HTMLCanvasElement | null = null;
+  private miniNodes = new Map<number, NodeView>();
   private lastRes: Resources = { wood: -1, stone: -1, gold: -1, coins: -1 };
   onBuildSelect: (type: BuildingType | null) => void = () => {};
   onUpgrade: (id: number) => void = () => {};
@@ -65,6 +69,8 @@ export class Hud {
       <div class="hud-hint">WASD move · Auto-attack near enemies · Click trees/rocks to gather · 1-9 build · U upgrade · K skills</div>
       <div class="minimap"><canvas id="minimap" width="164" height="164"></canvas></div>
       <div class="sel-panel hidden" id="sel-panel"></div>
+      <div class="interact-prompt hidden" id="interact-prompt"></div>
+      <div class="choice-overlay hidden" id="choice-overlay"></div>
       <div class="dmg-layer" id="dmg-layer"></div>
       <div class="notif-stack" id="notif-stack"></div>
       <div id="banner-slot"></div>
@@ -170,29 +176,105 @@ export class Hud {
     this.drawMinimap(players, enemies, buildings, selfId);
   }
 
+  /** Paint the static terrain layer once per game: meadow, river, bridges, fringe. */
+  initMinimapTerrain(seed: number, nodes: NodeView[]): void {
+    this.miniNodes.clear();
+    for (const n of nodes) this.miniNodes.set(n.id, n);
+    const c = document.createElement('canvas');
+    c.width = c.height = 164;
+    const ctx = c.getContext('2d')!;
+    const s = 164 / MAP_SIZE;
+    // meadow base with subtle radial shading
+    const grad = ctx.createRadialGradient(82, 82, 20, 82, 82, 120);
+    grad.addColorStop(0, '#55794a');
+    grad.addColorStop(0.7, '#46663c');
+    grad.addColorStop(1, '#314a28');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 164, 164);
+    // mottled grass speckles
+    for (let i = 0; i < 400; i++) {
+      ctx.fillStyle = i % 2 ? 'rgba(108,138,74,0.25)' : 'rgba(48,68,38,0.25)';
+      ctx.fillRect(Math.random() * 164, Math.random() * 164, 2, 2);
+    }
+    // river ribbon sampled from the shared channel math
+    const p = riverParams(seed);
+    ctx.strokeStyle = '#3e6e96';
+    ctx.lineWidth = RIVER_WIDTH * s;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let x = 0; x <= MAP_SIZE; x += 2) {
+      const y = riverYAt(x, p);
+      if (x === 0) ctx.moveTo(x * s, y * s); else ctx.lineTo(x * s, y * s);
+    }
+    ctx.stroke();
+    // sandy banks hint
+    ctx.strokeStyle = 'rgba(138,115,80,0.5)';
+    ctx.lineWidth = (RIVER_WIDTH + 1.6) * s;
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.beginPath();
+    for (let x = 0; x <= MAP_SIZE; x += 2) {
+      const y = riverYAt(x, p);
+      if (x === 0) ctx.moveTo(x * s, y * s); else ctx.lineTo(x * s, y * s);
+    }
+    ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+    // bridges
+    ctx.fillStyle = '#8a6238';
+    for (const bx of BRIDGE_XS) {
+      const by = riverYAt(bx, p);
+      ctx.fillRect(bx * s - 2, (by - RIVER_WIDTH / 2 - 1) * s, 4, (RIVER_WIDTH + 2) * s);
+    }
+    // castle clearing dirt ring
+    ctx.fillStyle = 'rgba(122,102,71,0.45)';
+    ctx.beginPath();
+    ctx.arc((CASTLE_POS.x + 2) * s, (CASTLE_POS.y + 2) * s, 8.5, 0, Math.PI * 2);
+    ctx.fill();
+    this.terrain = c;
+  }
+
+  removeMinimapNode(id: number): void { this.miniNodes.delete(id); }
+
   private drawMinimap(players: PlayerView[], enemies: EnemyView[],
                       buildings: BuildingView[], selfId: number): void {
     const ctx = this.mini;
     const s = 164 / MAP_SIZE;
-    ctx.fillStyle = '#16202f';
-    ctx.fillRect(0, 0, 164, 164);
-    ctx.fillStyle = '#8fa3bd';
+    if (this.terrain) ctx.drawImage(this.terrain, 0, 0);
+    else { ctx.fillStyle = '#16202f'; ctx.fillRect(0, 0, 164, 164); }
+    // forests and rocks
+    for (const n of this.miniNodes.values()) {
+      ctx.fillStyle = n.kind === 'tree' ? '#2e5526' : '#7d8087';
+      ctx.fillRect(n.pos.x * s - 0.8, n.pos.y * s - 0.8, 1.8, 1.8);
+    }
+    // player structures
     for (const b of buildings) {
       if (b.type === 'castle') continue;
-      ctx.fillRect(b.pos.x * s, b.pos.y * s, Math.max(2, 2 * s), Math.max(2, 2 * s));
+      const sz = BUILDINGS[b.type].size;
+      ctx.fillStyle = '#c9d2da';
+      ctx.fillRect(b.pos.x * s, b.pos.y * s, Math.max(2, sz * s), Math.max(2, sz * s));
     }
     const castle = buildings.find(b => b.type === 'castle');
     if (castle) {
       ctx.fillStyle = '#e8b64c';
+      ctx.strokeStyle = '#8a6a20';
       ctx.fillRect(castle.pos.x * s - 1, castle.pos.y * s - 1, 4 * s + 2, 4 * s + 2);
+      ctx.strokeRect(castle.pos.x * s - 1, castle.pos.y * s - 1, 4 * s + 2, 4 * s + 2);
     }
-    ctx.fillStyle = '#c43a31';
-    for (const e of enemies) ctx.fillRect(e.pos.x * s - 1, e.pos.y * s - 1, 2.4, 2.4);
+    // enemies pulse red
+    ctx.fillStyle = '#e0473c';
+    for (const e of enemies) {
+      const r = e.type === 'butcher' ? 3 : 1.4;
+      ctx.beginPath();
+      ctx.arc(e.pos.x * s, e.pos.y * s, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // players: ringed dots
     for (const p of players) {
-      ctx.fillStyle = p.id === selfId ? '#6fbf63' : '#6db8d8';
+      ctx.fillStyle = p.id === selfId ? '#8fe07a' : '#6db8d8';
       ctx.beginPath();
       ctx.arc(p.pos.x * s, p.pos.y * s, 3, 0, Math.PI * 2);
       ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.stroke();
     }
   }
 
@@ -225,6 +307,51 @@ export class Hud {
       while (layer.childElementCount > 60) layer.firstElementChild!.remove();
     }
   }
+
+  /** Contextual interaction prompt, e.g. "[E] Gather wood". */
+  showPrompt(label: string | null): void {
+    const el = this.q('#interact-prompt');
+    if (!label) { el.classList.add('hidden'); return; }
+    if (el.textContent !== label) el.textContent = label;
+    el.classList.remove('hidden');
+  }
+
+  // ---- wave-upgrade vote overlay ----
+  onVote: (option: number) => void = () => {};
+
+  showChoice(options: UpgradeDef[]): void {
+    const el = this.q('#choice-overlay');
+    el.classList.remove('hidden');
+    el.innerHTML = `
+      <div class="choice-title">Council of War</div>
+      <div class="choice-sub">The team must agree unanimously</div>
+      <div class="choice-cards">
+        ${options.map((o, i) => `
+          <button class="choice-card" data-i="${i}">
+            <div class="nm">${o.name}</div>
+            <div class="ds">${o.desc}</div>
+            <div class="vt" id="choice-votes-${i}"></div>
+          </button>`).join('')}
+      </div>`;
+    for (const btn of el.querySelectorAll('.choice-card')) {
+      (btn as HTMLElement).onclick = () => {
+        this.onVote(Number((btn as HTMLElement).dataset.i));
+        for (const b of el.querySelectorAll('.choice-card')) b.classList.toggle('picked', b === btn);
+      };
+    }
+  }
+
+  updateChoiceVotes(votes: (number | null)[]): void {
+    const el = this.q('#choice-overlay');
+    for (let i = 0; i < 3; i++) {
+      const slot = el.querySelector(`#choice-votes-${i}`);
+      if (!slot) continue;
+      const n = votes.filter(v => v === i).length;
+      slot.textContent = n > 0 ? '🗳'.repeat(n) : '';
+    }
+  }
+
+  hideChoice(): void { this.q('#choice-overlay').classList.add('hidden'); }
 
   banner(text: string, boss: boolean): void {
     const slot = this.q('#banner-slot');

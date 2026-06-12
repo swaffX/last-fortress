@@ -1,6 +1,6 @@
 import type {
   SimState, SimEvent, Command, Player, Building, Enemy, EnemyType,
-  ClassType, EntityId, Vec2, ResourceNode, BuildingType,
+  ClassType, EntityId, Vec2, ResourceNode, BuildingType, Projectile, ProjectileKind,
 } from './types';
 import { Rng } from './rng';
 import { Grid } from './grid';
@@ -11,7 +11,9 @@ import { waveComposition, enemyHpScale, enemyDmgScale } from './data/waves';
 import { applySkills, defaultModifiers, type SkillModifiers } from './data/skills';
 import { canAfford, charge, refund, scaleCost } from './economy';
 import { dist, buildingCenter, nearestEnemy } from './combat';
-import { riverParams, inRiver, type RiverParams } from './river';
+import {
+  riverParams, inRiver, inRiverBand, crossesBridgeRail, type RiverParams,
+} from './river';
 import {
   MAP_SIZE, CASTLE_POS, DAY_TICKS, PLAYER_SPEED, PLAYER_MAX_HP,
   START_RESOURCES, RESPAWN_TICKS, GATHER_AMOUNT, TICK_RATE,
@@ -23,6 +25,12 @@ const WEAPON_STATS = {
   crossbow: { range: 10,  dmg: 22, cooldown: 22 },
 } as const;
 
+const PROJECTILE_SPEED: Record<ProjectileKind, number> = {
+  arrow: 16, bolt: 19, spit: 9, bomb: 8,
+};
+const ENEMY_AGGRO_RANGE = 6;     // players this close pull zombies off the castle path
+const GATHER_RANGE = 2.2;        // E-key interaction reach
+
 export class Sim {
   readonly state: SimState;
   readonly grid: Grid;
@@ -30,7 +38,7 @@ export class Sim {
   readonly rng: Rng;
   readonly river: RiverParams;
   private moveIntent = new Map<EntityId, Vec2>();
-  private attackIntent = new Map<EntityId, Vec2>();
+  private gatherIntent = new Set<EntityId>();
   private buildQueue: { playerId: EntityId; type: BuildingType; pos: Vec2 }[] = [];
   private upgradeQueue: EntityId[] = [];
   private demolishQueue: EntityId[] = [];
@@ -38,13 +46,18 @@ export class Sim {
   constructor(seed: number) {
     this.rng = new Rng(seed);
     this.grid = new Grid(MAP_SIZE);
-    this.map = generateMap(this.rng);
     this.river = riverParams(seed);
+    this.map = generateMap(this.rng, this.river);
     this.state = {
       tick: 0, phase: 'day', phaseTicks: DAY_TICKS, wave: 0,
       pendingSpawns: [], resources: { ...START_RESOURCES },
       buildings: new Map(), enemies: new Map(), players: new Map(),
-      nodes: new Map(), castleId: 0, nextId: 1, gameOver: false,
+      nodes: new Map(), projectiles: new Map(),
+      bonuses: {
+        playerDmgMul: 1, towerDmgMul: 1, enemyDmgMul: 1,
+        incomeMul: 1, coinMul: 1, playerSpeedMul: 1,
+      },
+      castleId: 0, nextId: 1, gameOver: false,
     };
     const castle = this.makeBuilding('castle', CASTLE_POS, 1);
     this.state.castleId = castle.id;
@@ -76,7 +89,7 @@ export class Sim {
   removePlayer(id: EntityId): void {
     this.state.players.delete(id);
     this.moveIntent.delete(id);
-    this.attackIntent.delete(id);
+    this.gatherIntent.delete(id);
   }
 
   applyCommand(playerId: EntityId, cmd: Command): void {
@@ -84,7 +97,8 @@ export class Sim {
     if (!p || !p.alive || this.state.gameOver) return;
     switch (cmd.kind) {
       case 'move': this.moveIntent.set(playerId, cmd.dir); break;
-      case 'attack': this.attackIntent.set(playerId, cmd.dir); break;
+      case 'attack': break;   // combat is automatic; kept for protocol compat
+      case 'gather': this.gatherIntent.add(playerId); break;
       case 'build': this.buildQueue.push({ playerId, type: cmd.type, pos: cmd.pos }); break;
       case 'upgrade': this.upgradeQueue.push(cmd.buildingId); break;
       case 'demolish': this.demolishQueue.push(cmd.buildingId); break;
@@ -99,15 +113,43 @@ export class Sim {
     this.stepBuildCommands(events);
     this.stepIncome();
     this.stepPlayers(events);
-    this.stepGather();
+    this.stepGather(events);
     this.stepTowers(events);
     this.stepPlayerCombat(events);
+    this.stepProjectiles(events);
     this.stepSpawns();
     this.stepEnemies(events);
+    this.stepSeparation();
     this.stepSupport();
     this.stepRespawns();
-    this.attackIntent.clear();
+    this.gatherIntent.clear();
     return events;
+  }
+
+  /** Apply a unanimously voted team upgrade. */
+  applyUpgrade(id: string): void {
+    const b = this.state.bonuses;
+    switch (id) {
+      case 'sharp_steel': b.playerDmgMul *= 1.15; break;
+      case 'siege_works': b.towerDmgMul *= 1.2; break;
+      case 'weakening_curse': b.enemyDmgMul *= 0.85; break;
+      case 'fortify': {
+        const castle = this.state.buildings.get(this.state.castleId);
+        if (castle) {
+          castle.maxHp = Math.round(castle.maxHp * 1.25);
+          castle.hp = Math.min(castle.maxHp, Math.round(castle.hp + castle.maxHp * 0.3));
+        }
+        break;
+      }
+      case 'prosperity': b.incomeMul *= 1.25; break;
+      case 'war_spoils': b.coinMul *= 1.3; break;
+      case 'fleet_footed': b.playerSpeedMul *= 1.12; break;
+      case 'masons_call':
+        for (const bld of this.state.buildings.values()) {
+          bld.hp = Math.min(bld.maxHp, Math.round(bld.hp + bld.maxHp * 0.5));
+        }
+        break;
+    }
   }
 
   // ---- clock & waves ----
@@ -170,6 +212,7 @@ export class Sim {
       if (def.unlockCastleLevel > this.castleLevel) continue;
       const pos = { x: Math.floor(req.pos.x), y: Math.floor(req.pos.y) };
       if (!this.grid.canPlace(pos, def.size)) continue;
+      if (this.footprintInRiver(pos, def.size)) continue;   // no construction in the riverbed
       const cost = scaleCost(def.tiers[0]!.cost, team.buildCostMul);
       if (!canAfford(this.state.resources, cost)) continue;
       charge(this.state.resources, cost);
@@ -207,7 +250,7 @@ export class Sim {
   }
 
   private stepIncome(): void {
-    const mul = this.teamMods().incomeMul;
+    const mul = this.teamMods().incomeMul * this.state.bonuses.incomeMul;
     for (const b of this.state.buildings.values()) {
       const stats = BUILDINGS[b.type].tiers[b.tier - 1]!;
       if (!stats.income || !stats.cooldownTicks) continue;
@@ -219,16 +262,16 @@ export class Sim {
     }
   }
 
-  private stepGather(): void {
-    for (const [pid] of this.attackIntent) {
+  private stepGather(events: SimEvent[]): void {
+    for (const pid of this.gatherIntent) {
       const p = this.state.players.get(pid);
       if (!p || !p.alive || p.attackCooldown > 0) continue;
       let best: { node: ResourceNode; d: number } | null = null;
       for (const n of this.state.nodes.values()) {
         const d = dist({ x: n.pos.x + 0.5, y: n.pos.y + 0.5 }, p.pos);
-        if (d <= 1.6 && (!best || d < best.d)) best = { node: n, d };
+        if (d <= GATHER_RANGE && (!best || d < best.d)) best = { node: n, d };
       }
-      if (!best) continue;  // not near a node → combat handles this intent
+      if (!best) continue;
       p.attackCooldown = 12;
       const take = Math.min(GATHER_AMOUNT, best.node.amount);
       best.node.amount -= take;
@@ -237,8 +280,9 @@ export class Sim {
       if (best.node.amount <= 0) {
         this.grid.clear(best.node.pos, 1);
         this.state.nodes.delete(best.node.id);
+        events.push({ kind: 'node_depleted', nodeId: best.node.id, pos: { ...best.node.pos } });
       }
-      this.attackIntent.delete(pid);
+      events.push({ kind: 'melee', pos: { ...p.pos } });   // chop animation + sfx
     }
   }
 
@@ -257,6 +301,63 @@ export class Sim {
     return e;
   }
 
+  /** Launch a homing projectile; damage applies in stepProjectiles on impact. */
+  private spawnProjectile(kind: ProjectileKind, from: Vec2, dmg: number, opts: {
+    targetEnemy?: EntityId; targetPlayer?: EntityId; targetBuilding?: EntityId;
+    targetPos?: Vec2; crit?: boolean; aoeRadius?: number; slowMul?: number; slowTicks?: number;
+  }): void {
+    const id = this.state.nextId++;
+    const tp = opts.targetPos
+      ?? (opts.targetEnemy !== undefined ? this.state.enemies.get(opts.targetEnemy)?.pos : undefined)
+      ?? (opts.targetPlayer !== undefined ? this.state.players.get(opts.targetPlayer)?.pos : undefined)
+      ?? from;
+    this.state.projectiles.set(id, {
+      id, kind, pos: { ...from }, speed: PROJECTILE_SPEED[kind], dmg,
+      crit: opts.crit ?? false,
+      targetEnemy: opts.targetEnemy ?? null,
+      targetPlayer: opts.targetPlayer ?? null,
+      targetBuilding: opts.targetBuilding ?? null,
+      targetPos: { ...tp },
+      aoeRadius: opts.aoeRadius, slowMul: opts.slowMul, slowTicks: opts.slowTicks,
+    });
+  }
+
+  private stepProjectiles(events: SimEvent[]): void {
+    for (const pr of [...this.state.projectiles.values()]) {
+      // home toward the live target; fall back to last known point
+      const enemy = pr.targetEnemy !== null ? this.state.enemies.get(pr.targetEnemy) : undefined;
+      const player = pr.targetPlayer !== null ? this.state.players.get(pr.targetPlayer) : undefined;
+      const building = pr.targetBuilding !== null ? this.state.buildings.get(pr.targetBuilding) : undefined;
+      const aim = enemy?.pos
+        ?? (player?.alive ? player.pos : undefined)
+        ?? (building ? buildingCenter(building.pos, BUILDINGS[building.type].size) : undefined)
+        ?? pr.targetPos;
+      pr.targetPos = { ...aim };
+      const step = pr.speed / TICK_RATE;
+      const dx = aim.x - pr.pos.x, dy = aim.y - pr.pos.y;
+      const d = Math.hypot(dx, dy);
+      if (d > step) {
+        pr.pos.x += (dx / d) * step;
+        pr.pos.y += (dy / d) * step;
+        continue;
+      }
+      // impact
+      pr.pos = { ...aim };
+      this.state.projectiles.delete(pr.id);
+      if (pr.kind === 'bomb') {
+        this.explode(pr.pos, pr.aoeRadius ?? 2, pr.dmg, events);
+      } else if (enemy) {
+        if (pr.slowMul) { enemy.speedMul = pr.slowMul; enemy.slowTicks = pr.slowTicks!; }
+        this.damageEnemy(enemy.id, pr.dmg, events, pr.crit);
+      } else if (player?.alive) {
+        this.damagePlayer(player.id, pr.dmg);
+        events.push({ kind: 'damage', pos: { ...player.pos }, amount: pr.dmg, crit: false });
+      } else if (building) {
+        this.damageBuilding(building.id, pr.dmg, events);
+      }
+    }
+  }
+
   damageEnemy(id: EntityId, amount: number, events: SimEvent[], crit = false): void {
     const e = this.state.enemies.get(id);
     if (!e) return;
@@ -265,7 +366,7 @@ export class Sim {
     if (e.hp > 0) return;
     this.state.enemies.delete(id);
     const def = ENEMIES[e.type];
-    const coins = Math.round(def.coins * this.teamMods().coinMul);
+    const coins = Math.round(def.coins * this.teamMods().coinMul * this.state.bonuses.coinMul);
     this.state.resources.coins += coins;
     events.push({ kind: 'death', pos: { ...e.pos }, enemy: e.type });
     events.push({ kind: 'coins', pos: { ...e.pos }, amount: coins });
@@ -324,11 +425,13 @@ export class Sim {
       const target = nearestEnemy(this.state.enemies.values(), center, range);
       if (!target) continue;
       b.cooldown = stats.cooldownTicks;
-      const dmg = Math.round(stats.dmg * team.towerDmgMul);
+      const dmg = Math.round(stats.dmg * team.towerDmgMul * this.state.bonuses.towerDmgMul);
 
       if (b.type === 'bomb_tower') {
         events.push({ kind: 'projectile', from: center, to: { ...target.pos }, weapon: 'bomb' });
-        this.explode(target.pos, stats.aoeRadius!, dmg, events);
+        this.spawnProjectile('bomb', center, dmg, {
+          targetPos: { ...target.pos }, aoeRadius: stats.aoeRadius,
+        });
       } else if (b.type === 'lightning_tower') {
         const points: Vec2[] = [center];
         let cur: Enemy | null = target;
@@ -342,15 +445,16 @@ export class Sim {
             [...this.state.enemies.values()].filter(e => !hit.has(e.id)), from, 4);
         }
         events.push({ kind: 'chain', points });
-      } else {
-        const weapon = b.type === 'ice_tower' ? 'ice'
-          : b.type === 'crossbow_tower' ? 'bolt' : 'arrow';
-        events.push({ kind: 'projectile', from: center, to: { ...target.pos }, weapon });
-        if (stats.slowMul) {
-          target.speedMul = stats.slowMul;
-          target.slowTicks = stats.slowTicks!;
-        }
+      } else if (b.type === 'ice_tower') {
+        // ice stays hitscan — the frost beam visual reads as instant
+        events.push({ kind: 'projectile', from: center, to: { ...target.pos }, weapon: 'ice' });
+        target.speedMul = stats.slowMul!;
+        target.slowTicks = stats.slowTicks!;
         this.damageEnemy(target.id, dmg, events);
+      } else {
+        const weapon = b.type === 'crossbow_tower' ? 'bolt' : 'arrow';
+        events.push({ kind: 'projectile', from: center, to: { ...target.pos }, weapon });
+        this.spawnProjectile(weapon, center, dmg, { targetEnemy: target.id });
       }
     }
   }
@@ -361,7 +465,7 @@ export class Sim {
       if (!p.alive || p.attackCooldown > 0) continue;
       const w = WEAPON_STATS[p.weapon];
       // class passives: knight +25% melee dmg, hunter +20% ranged range
-      let dmg = w.dmg * p.mods.playerDmgMul;
+      let dmg = w.dmg * p.mods.playerDmgMul * this.state.bonuses.playerDmgMul;
       if (p.klass === 'knight' && p.weapon === 'sword') dmg *= 1.25;
       let range = w.range;
       if (p.klass === 'hunter' && p.weapon !== 'sword') range *= 1.2;
@@ -371,12 +475,14 @@ export class Sim {
       const crit = this.rng.next() < p.mods.critChance;
       if (crit) dmg *= 2;
       if (p.weapon !== 'sword') {
-        events.push({ kind: 'projectile', from: { ...p.pos }, to: { ...target.pos },
-                      weapon: p.weapon === 'bow' ? 'arrow' : 'bolt' });
+        // ranged shots fly as real projectiles: damage lands when the arrow does
+        const weapon = p.weapon === 'bow' ? 'arrow' : 'bolt';
+        events.push({ kind: 'projectile', from: { ...p.pos }, to: { ...target.pos }, weapon });
+        this.spawnProjectile(weapon, p.pos, Math.round(dmg), { targetEnemy: target.id, crit });
       } else {
         events.push({ kind: 'melee', pos: { ...p.pos } });
+        this.damageEnemy(target.id, Math.round(dmg), events, crit);
       }
-      this.damageEnemy(target.id, Math.round(dmg), events, crit);
     }
   }
 
@@ -392,22 +498,30 @@ export class Sim {
       if (e.type === 'butcher' && !e.enraged && e.hp < e.maxHp * 0.5) e.enraged = true;
 
       const speed = (def.speed / TICK_RATE) * e.speedMul * (e.enraged ? 1.6 : 1);
-      const dmg = Math.round(def.dmg * enemyDmgScale(Math.max(1, this.state.wave)) * (e.enraged ? 1.5 : 1));
+      const dmg = Math.round(def.dmg * enemyDmgScale(Math.max(1, this.state.wave))
+        * (e.enraged ? 1.5 : 1) * this.state.bonuses.enemyDmgMul);
 
-      // 1. player in attack range → attack player
-      let nearPlayer: Player | null = null; let pd = def.attackRange;
+      // 1. aggro: a player nearby pulls the zombie off its castle path entirely
+      let aggro: Player | null = null; let ad = ENEMY_AGGRO_RANGE;
       for (const p of this.state.players.values()) {
         if (!p.alive) continue;
         const d = dist(p.pos, e.pos);
-        if (d <= pd) { pd = d; nearPlayer = p; }
+        if (d <= ad) { ad = d; aggro = p; }
       }
-      if (nearPlayer) {
-        if (e.attackCooldown === 0) {
-          e.attackCooldown = def.attackCooldownTicks;
-          if (def.attackRange > 2) {
-            events.push({ kind: 'projectile', from: { ...e.pos }, to: { ...nearPlayer.pos }, weapon: 'spit' });
+      if (aggro) {
+        if (ad <= def.attackRange) {
+          // in range: stand and fight
+          if (e.attackCooldown === 0) {
+            e.attackCooldown = def.attackCooldownTicks;
+            if (def.attackRange > 2) {
+              events.push({ kind: 'projectile', from: { ...e.pos }, to: { ...aggro.pos }, weapon: 'spit' });
+              this.spawnProjectile('spit', e.pos, dmg, { targetPlayer: aggro.id });
+            } else {
+              this.damagePlayer(aggro.id, dmg);
+            }
           }
-          this.damagePlayer(nearPlayer.id, dmg);
+        } else {
+          this.moveEnemyToward(e, aggro.pos, speed, events);
         }
         continue;
       }
@@ -421,21 +535,59 @@ export class Sim {
             const size = BUILDINGS[targetB.type].size;
             events.push({ kind: 'projectile', from: { ...e.pos },
               to: buildingCenter(targetB.pos, size), weapon: 'spit' });
+            this.spawnProjectile('spit', e.pos, dmg, { targetBuilding: targetB.id });
+          } else {
+            this.damageBuilding(targetB.id, dmg, events);
           }
-          this.damageBuilding(targetB.id, dmg, events);
         }
         continue;  // hold position while attacking
       }
 
-      // 3. walk toward the castle (rivers slow the horde too — natural moat)
-      const wading = inRiver(e.pos, this.river);
-      const moveSpeed = speed * (wading ? 0.55 : 1);
-      const dx = castleCenter.x - e.pos.x, dy = castleCenter.y - e.pos.y;
-      const len = Math.hypot(dx, dy) || 1;
-      e.pos.x += (dx / len) * moveSpeed;
-      e.pos.y += (dy / len) * moveSpeed;
-      if (wading && (this.state.tick + e.id) % 9 === 0) {
-        events.push({ kind: 'splash', pos: { ...e.pos } });
+      // 3. march on the castle
+      this.moveEnemyToward(e, castleCenter, speed, events);
+    }
+  }
+
+  private moveEnemyToward(e: Enemy, target: Vec2, speed: number, events: SimEvent[]): void {
+    const wading = inRiver(e.pos, this.river);
+    const moveSpeed = speed * (wading ? 0.55 : 1);
+    const dx = target.x - e.pos.x, dy = target.y - e.pos.y;
+    const len = Math.hypot(dx, dy) || 1;
+    e.pos.x += (dx / len) * moveSpeed;
+    e.pos.y += (dy / len) * moveSpeed;
+    if (wading && (this.state.tick + e.id) % 9 === 0) {
+      events.push({ kind: 'splash', pos: { ...e.pos } });
+    }
+  }
+
+  /** Soft-body separation: zombies shoulder each other apart instead of stacking. */
+  private stepSeparation(): void {
+    if (this.state.enemies.size < 2) return;
+    const buckets = new Map<number, Enemy[]>();
+    const key = (x: number, y: number) => (Math.floor(x / 2) << 10) | Math.floor(y / 2);
+    for (const e of this.state.enemies.values()) {
+      const k = key(e.pos.x, e.pos.y);
+      const arr = buckets.get(k);
+      if (arr) arr.push(e); else buckets.set(k, [e]);
+    }
+    for (const e of this.state.enemies.values()) {
+      const ra = ENEMIES[e.type].radius;
+      const bx = Math.floor(e.pos.x / 2), by = Math.floor(e.pos.y / 2);
+      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
+        const cell = buckets.get(((bx + ox) << 10) | (by + oy));
+        if (!cell) continue;
+        for (const o of cell) {
+          if (o.id <= e.id) continue;   // each pair once
+          const rb = ENEMIES[o.type].radius;
+          const minD = (ra + rb) * 0.9;
+          const dx = o.pos.x - e.pos.x, dy = o.pos.y - e.pos.y;
+          const d = Math.hypot(dx, dy);
+          if (d >= minD || d === 0) continue;
+          const push = (minD - d) / 2;
+          const nx = dx / d, ny = dy / d;
+          e.pos.x -= nx * push; e.pos.y -= ny * push;
+          o.pos.x += nx * push; o.pos.y += ny * push;
+        }
       }
     }
   }
@@ -501,16 +653,44 @@ export class Sim {
       const dir = this.moveIntent.get(p.id);
       if (dir) {
         const wading = inRiver(p.pos, this.river);
-        const speed = PLAYER_SPEED * (wading ? 0.5 : 1);
+        const speed = PLAYER_SPEED * this.state.bonuses.playerSpeedMul * (wading ? 0.5 : 1);
         const len = Math.hypot(dir.x, dir.y) || 1;
-        p.pos.x = clamp(p.pos.x + (dir.x / len) * speed, 0, MAP_SIZE - 1);
-        p.pos.y = clamp(p.pos.y + (dir.y / len) * speed, 0, MAP_SIZE - 1);
+        // axis-separated movement: blocked on one axis still slides on the other
+        this.tryMovePlayer(p, (dir.x / len) * speed, 0);
+        this.tryMovePlayer(p, 0, (dir.y / len) * speed);
         if (wading && (this.state.tick + p.id) % 7 === 0) {
           events.push({ kind: 'splash', pos: { ...p.pos } });
         }
       }
     }
     this.moveIntent.clear();
+  }
+
+  /** Solid-world collision: buildings (except gates), resource nodes, bridge rails. */
+  private tryMovePlayer(p: Player, dx: number, dy: number): void {
+    const next = {
+      x: clamp(p.pos.x + dx, 0.5, MAP_SIZE - 0.5),
+      y: clamp(p.pos.y + dy, 0.5, MAP_SIZE - 0.5),
+    };
+    if (this.isSolidAt(next)) return;
+    if (crossesBridgeRail(p.pos, next, this.river)) return;
+    p.pos.x = next.x;
+    p.pos.y = next.y;
+  }
+
+  footprintInRiver(pos: Vec2, size: number): boolean {
+    for (let y = pos.y; y < pos.y + size; y++)
+      for (let x = pos.x; x < pos.x + size; x++)
+        if (inRiverBand(x + 0.5, y + 0.5, this.river, 0.2)) return true;
+    return false;
+  }
+
+  isSolidAt(pos: Vec2): boolean {
+    const id = this.grid.occupantAt(pos);
+    if (id === 0) return false;
+    const b = this.state.buildings.get(id);
+    if (b) return !BUILDINGS[b.type].walkable;   // gates are passable
+    return this.state.nodes.has(id);             // trees and rocks are solid
   }
 
   private makeBuilding(type: BuildingType, pos: Vec2, tier: number): Building {

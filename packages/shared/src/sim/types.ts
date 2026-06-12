@@ -73,14 +73,46 @@ export interface SimState {
   enemies: Map<EntityId, Enemy>;
   players: Map<EntityId, Player>;
   nodes: Map<EntityId, ResourceNode>;
+  projectiles: Map<EntityId, Projectile>;
+  bonuses: TeamBonuses;
   castleId: EntityId;
   nextId: EntityId;
   gameOver: boolean;
 }
 
+export type ProjectileKind = 'arrow' | 'bolt' | 'spit' | 'bomb';
+
+/** In-flight projectile — damage lands on impact, not on fire. */
+export interface Projectile {
+  id: EntityId;
+  kind: ProjectileKind;
+  pos: Vec2;
+  speed: number;          // world units per second
+  dmg: number;
+  crit: boolean;
+  targetEnemy: EntityId | null;
+  targetPlayer: EntityId | null;
+  targetBuilding: EntityId | null;
+  targetPos: Vec2;        // fallback aim point (target died) / bomb ground aim
+  aoeRadius?: number;     // bomb
+  slowMul?: number;
+  slowTicks?: number;
+}
+
+/** Team-wide modifiers from wave-vote upgrades. */
+export interface TeamBonuses {
+  playerDmgMul: number;
+  towerDmgMul: number;
+  enemyDmgMul: number;    // <1 = weakened enemies
+  incomeMul: number;
+  coinMul: number;
+  playerSpeedMul: number;
+}
+
 export type Command =
   | { kind: 'move'; dir: Vec2 }                                  // dir normalized client-side; re-normalized in sim
-  | { kind: 'attack'; dir: Vec2 }
+  | { kind: 'attack'; dir: Vec2 }                                // legacy no-op (combat is automatic)
+  | { kind: 'gather' }                                           // E key: harvest nearest node in reach
   | { kind: 'build'; type: BuildingType; pos: Vec2 }
   | { kind: 'upgrade'; buildingId: EntityId }
   | { kind: 'demolish'; buildingId: EntityId };
@@ -90,6 +122,7 @@ export type SimEvent =
   | { kind: 'damage'; pos: Vec2; amount: number; crit: boolean }
   | { kind: 'melee'; pos: Vec2 }
   | { kind: 'splash'; pos: Vec2 }
+  | { kind: 'node_depleted'; nodeId: EntityId; pos: Vec2 }
   | { kind: 'explosion'; pos: Vec2; radius: number }
   | { kind: 'chain'; points: Vec2[] }
   | { kind: 'death'; pos: Vec2; enemy: EnemyType }

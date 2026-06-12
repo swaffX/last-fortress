@@ -44,3 +44,24 @@ export function inRiver(pos: Vec2, p: RiverParams): boolean {
   if (onBridge(pos)) return false;
   return Math.abs(pos.y - riverYAt(pos.x, p)) < RIVER_WIDTH / 2;
 }
+
+/** Within the river band regardless of bridges (for terrain placement). */
+export function inRiverBand(x: number, y: number, p: RiverParams, margin = 0): boolean {
+  return Math.abs(y - riverYAt(x, p)) < RIVER_WIDTH / 2 + margin;
+}
+
+/**
+ * Bridge decks are elevated: you can only walk on or off at the ends.
+ * Returns true when a movement segment would climb over a side rail —
+ * either from the water onto the deck or off the deck into the water.
+ */
+export function crossesBridgeRail(from: Vec2, to: Vec2, p: RiverParams): boolean {
+  for (const bx of BRIDGE_XS) {
+    for (const rail of [bx - BRIDGE_HALF_WIDTH, bx + BRIDGE_HALF_WIDTH]) {
+      if ((from.x - rail) * (to.x - rail) >= 0) continue;   // didn't cross the line
+      const midY = (from.y + to.y) / 2;
+      if (Math.abs(midY - riverYAt(rail, p)) < RIVER_WIDTH / 2 + 0.6) return true;
+    }
+  }
+  return false;
+}

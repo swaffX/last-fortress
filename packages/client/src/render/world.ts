@@ -1,7 +1,12 @@
 import * as THREE from 'three';
-import { BUILDINGS, riverParams, inRiver, type EntityId, type RiverParams } from '@lf/shared';
-import type { BuildingView, EnemyView, PlayerView, NodeView } from '../net';
-import { buildingModel, enemyModel, playerModel, treeModel, rockModel } from './models';
+import {
+  BUILDINGS, MAP_SIZE, riverParams, inRiver, inRiverBand, onBridge, crossesBridgeRail,
+  type EntityId, type RiverParams,
+} from '@lf/shared';
+import type { BuildingView, EnemyView, PlayerView, NodeView, ProjectileView } from '../net';
+import {
+  buildingModel, enemyModel, playerModel, treeModel, rockModel, projectileModel,
+} from './models';
 
 interface Tracked {
   obj: THREE.Group;
@@ -38,8 +43,23 @@ export class World {
   private selfPredicted: THREE.Vector3 | null = null;
   private selfDir = { x: 0, y: 0 };
   private riverP: RiverParams | null = null;
+  /** latest frame views — prediction collides against the same world the sim does */
+  colliders: { buildings: BuildingView[]; nodes: NodeView[] } = { buildings: [], nodes: [] };
 
   setSeed(seed: number): void { this.riverP = riverParams(seed); }
+
+  private isSolidAt(x: number, y: number): boolean {
+    const cx = Math.floor(x), cy = Math.floor(y);
+    for (const b of this.colliders.buildings) {
+      if (BUILDINGS[b.type].walkable) continue;
+      const s = BUILDINGS[b.type].size;
+      if (cx >= b.pos.x && cx < b.pos.x + s && cy >= b.pos.y && cy < b.pos.y + s) return true;
+    }
+    for (const n of this.colliders.nodes) {
+      if (n.pos.x === cx && n.pos.y === cy) return true;
+    }
+    return false;
+  }
 
   constructor(private scene: THREE.Scene) {}
 
@@ -60,14 +80,31 @@ export class World {
     }
   }
 
+  /** Drop all entities (used when a fresh match starts in the same session). */
+  reset(): void {
+    for (const t of this.tracked.values()) this.scene.remove(t.obj);
+    this.tracked.clear();
+    for (const g of this.nodes.values()) this.scene.remove(g);
+    this.nodes.clear();
+    this.selfPredicted = null;
+  }
+
   /** Called once per server frame (20 Hz). render() interpolates between frames. */
-  applyFrame(players: PlayerView[], enemies: EnemyView[], buildings: BuildingView[]): void {
+  applyFrame(players: PlayerView[], enemies: EnemyView[], buildings: BuildingView[],
+             projectiles: ProjectileView[]): void {
     const seen = new Set<EntityId>();
 
     for (const p of players) {
       seen.add(p.id);
-      this.upsert(p.id, `player:${p.klass}:${p.alive}`, p.pos.x, p.pos.y,
-        () => playerModel(p.klass), p.hp / p.maxHp);
+      const t = this.upsert(p.id, `player:${p.klass}:${p.alive}`, p.pos.x, p.pos.y,
+        () => playerModel(p.klass), 1);   // hp shown on the nameplate, not the bar
+      this.updateNameplate(t, p.id === this.selfId ? 'You' : p.name, p.hp / p.maxHp,
+        p.id === this.selfId);
+    }
+    for (const pr of projectiles) {
+      seen.add(pr.id);
+      this.upsert(pr.id, `proj:${pr.kind}`, pr.pos.x, pr.pos.y,
+        () => projectileModel(pr.kind), 1);
     }
     for (const e of enemies) {
       seen.add(e.id);
@@ -152,6 +189,45 @@ export class World {
     return t;
   }
 
+  /** Nameplate sprite: name text with an hp bar underneath, hovering overhead. */
+  private updateNameplate(t: Tracked, name: string, hpRatio: number, self: boolean): void {
+    let plate = t.obj.userData.plate as THREE.Sprite | undefined;
+    if (!plate) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128; canvas.height = 40;
+      plate = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(canvas), depthTest: false,
+      }));
+      plate.scale.set(2.2, 0.69, 1);
+      plate.position.y = 2.35;
+      plate.userData.canvas = canvas;
+      plate.userData.key = '';
+      t.obj.add(plate);
+      t.obj.userData.plate = plate;
+      if (t.hpBar) t.hpBar.visible = false;   // nameplate replaces the bare bar
+    }
+    const key = `${name}|${hpRatio.toFixed(2)}|${self}`;
+    if (plate.userData.key === key) return;
+    plate.userData.key = key;
+    const canvas = plate.userData.canvas as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, 128, 40);
+    ctx.font = '700 16px "Alegreya Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    ctx.strokeText(name, 64, 16);
+    ctx.fillStyle = self ? '#8fe07a' : '#e8dfc8';
+    ctx.fillText(name, 64, 16);
+    // hp bar under the name
+    ctx.fillStyle = 'rgba(7,11,18,0.85)';
+    ctx.fillRect(24, 24, 80, 9);
+    const c = hpRatio > 0.5 ? '#6fbf63' : hpRatio > 0.25 ? '#e8b64c' : '#c43a31';
+    ctx.fillStyle = c;
+    ctx.fillRect(25, 25, 78 * Math.max(0, hpRatio), 7);
+    (plate.material.map as THREE.CanvasTexture).needsUpdate = true;
+  }
+
   /** Point the matching tower's turret at a target; kick recoil. Called on projectile events. */
   aimTower(from: { x: number; y: number }, to: { x: number; y: number }): void {
     let best: Tracked | null = null;
@@ -198,12 +274,21 @@ export class World {
         const len = Math.hypot(this.selfDir.x, this.selfDir.y);
         const moving = len > 0.001;
         if (moving) {
-          // mirror the sim: wading through the river halves movement speed
+          // mirror the sim: river slowdown + axis-separated solid collision
           const wading = this.riverP &&
             inRiver({ x: this.selfPredicted.x, y: this.selfPredicted.z }, this.riverP);
           const speed = wading ? 3 : 6;
-          this.selfPredicted.x += (this.selfDir.x / len) * speed * dt;
-          this.selfPredicted.z += (this.selfDir.y / len) * speed * dt;
+          const stepX = (this.selfDir.x / len) * speed * dt;
+          const stepY = (this.selfDir.y / len) * speed * dt;
+          for (const [mx, my] of [[stepX, 0], [0, stepY]] as const) {
+            const from = { x: this.selfPredicted.x, y: this.selfPredicted.z };
+            const nx = THREE.MathUtils.clamp(from.x + mx, 0.5, MAP_SIZE - 0.5);
+            const ny = THREE.MathUtils.clamp(from.y + my, 0.5, MAP_SIZE - 0.5);
+            if (this.isSolidAt(nx, ny)) continue;
+            if (this.riverP && crossesBridgeRail(from, { x: nx, y: ny }, this.riverP)) continue;
+            this.selfPredicted.x = nx;
+            this.selfPredicted.z = ny;
+          }
         }
         // reconcile: gentle pull normally, hard snap if server disagrees a lot
         const err = this.selfPredicted.distanceTo(t.to);
@@ -212,6 +297,7 @@ export class World {
         t.obj.position.copy(this.selfPredicted);
         if (moving) t.targetHeading = Math.atan2(this.selfDir.x, this.selfDir.y);
         this.applyHeading(t, dt, 12);
+        this.applyDeckHeight(t, dt);
         this.animateCharacter(t, moving, dt);
         continue;
       }
@@ -222,7 +308,12 @@ export class World {
         const moving = Math.abs(dx) + Math.abs(dz) > 0.004;
         if (moving) t.targetHeading = Math.atan2(dx, dz);
         this.applyHeading(t, dt, t.kind.startsWith('player') ? 12 : 7);
-        this.animateCharacter(t, moving, dt);
+        if (t.kind.startsWith('proj:')) {
+          t.obj.position.y = 1.1;   // projectiles fly chest-height
+        } else {
+          this.applyDeckHeight(t, dt);
+          this.animateCharacter(t, moving, dt);
+        }
       } else {
         this.animateBuilding(t, dt);
       }
@@ -251,6 +342,15 @@ export class World {
     t.turnRate += (instRate - t.turnRate) * Math.min(1, dt * 10);
     t.obj.rotation.y = t.heading;
     t.obj.rotation.z = THREE.MathUtils.clamp(-t.turnRate * 0.045, -0.16, 0.16);
+  }
+
+  /** Characters step up onto the bridge deck instead of clipping through it. */
+  private applyDeckHeight(t: Tracked, dt: number): void {
+    if (!this.riverP) return;
+    const pos = { x: t.obj.position.x, y: t.obj.position.z };
+    const onDeck = onBridge(pos) && inRiverBand(pos.x, pos.y, this.riverP, 1.2);
+    const targetY = onDeck ? 0.45 : 0;
+    t.obj.position.y += (targetY - t.obj.position.y) * Math.min(1, dt * 10);
   }
 
   private animateCharacter(t: Tracked, moving: boolean, dt: number): void {

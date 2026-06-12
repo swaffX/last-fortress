@@ -1,5 +1,6 @@
 import type {
   Command, SimEvent, Phase, EnemyType, BuildingType, ClassType, EntityId, Resources, Vec2,
+  ProjectileKind, UpgradeDef,
 } from '@lf/shared';
 
 /** Client → Server messages. */
@@ -11,6 +12,8 @@ export type ClientMsg =
   | { t: 'cmd'; cmd: Command }
   | { t: 'ping'; pos: Vec2 }                                     // map marker for teammates
   | { t: 'unlock_skill'; skillId: string }
+  | { t: 'vote'; option: number }                                // wave-upgrade vote (0..2)
+  | { t: 'restart_vote' }                                        // game-over: try again
   | { t: 'leave' };
 
 export interface BuildingView {
@@ -25,6 +28,9 @@ export interface PlayerView {
 export interface NodeView {
   id: EntityId; kind: 'tree' | 'rock'; pos: Vec2; amount: number;
 }
+export interface ProjectileView {
+  id: EntityId; kind: ProjectileKind; pos: Vec2;
+}
 
 /** Server → Client messages. */
 export type ServerMsg =
@@ -33,10 +39,15 @@ export type ServerMsg =
   | { t: 'game_start'; seed: number; selfId: EntityId; nodes: NodeView[]; buildings: BuildingView[] }
   | { t: 'frame'; tick: number; phase: Phase; phaseTicks: number; wave: number;
       resources: Resources; players: PlayerView[]; enemies: EnemyView[];
-      buildings: BuildingView[]; events: SimEvent[] }
+      buildings: BuildingView[]; projectiles: ProjectileView[]; events: SimEvent[] }
   | { t: 'ping'; pos: Vec2; from: string }
   | { t: 'profile'; profile: ProfileView }
+  | { t: 'choice_offer'; options: UpgradeDef[] }
+  | { t: 'choice_state'; votes: (number | null)[] }              // one entry per seat
+  | { t: 'choice_applied'; option: UpgradeDef }
   | { t: 'game_over'; wave: number; coinsEarned: number; skillPointsEarned: number }
+  | { t: 'restart_state'; votes: number; needed: number }
+  | { t: 'lobby_closed' }
   | { t: 'error'; message: string };
 
 export interface ProfileView {

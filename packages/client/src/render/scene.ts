@@ -2,7 +2,16 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { MAP_SIZE } from '@lf/shared';
+import { MAP_SIZE, TICK_RATE } from '@lf/shared';
+
+/** season palette: [groundTint, sunTint, hemiSky] */
+const SEASONS: [number, number, number][] = [
+  [0xffffff, 0xffeacb, 0xcfe4ff],   // spring — fresh
+  [0xfff0c2, 0xffe2a8, 0xd8e8ff],   // summer — golden
+  [0xe8c89a, 0xffc890, 0xe0d8c8],   // autumn — amber
+  [0xc8d8e4, 0xdce8f5, 0xbcd0e8],   // winter — pale
+];
+const SEASON_TICKS = TICK_RATE * 240;   // 4 minutes per season
 
 /**
  * 2.5D top-down stage: orthographic camera tilted ~62 degrees, looking down
@@ -26,6 +35,11 @@ export class Stage {
   private shake = 0;
   private nightMix = 0;
   private nightTarget = 0;
+  private seasonT = 0;
+  private groundMat!: THREE.MeshLambertMaterial;
+  private snow!: THREE.InstancedMesh;
+  private leaves!: THREE.InstancedMesh;
+  private flakeSeeds: number[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -72,9 +86,10 @@ export class Stage {
     groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
     groundTex.repeat.set(18, 18);
     groundTex.colorSpace = THREE.SRGBColorSpace;
+    this.groundMat = new THREE.MeshLambertMaterial({ map: groundTex });
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE),
-      new THREE.MeshLambertMaterial({ map: groundTex }),
+      this.groundMat,
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(MAP_SIZE / 2, 0, MAP_SIZE / 2);
@@ -93,6 +108,38 @@ export class Stage {
     fringe.rotation.x = -Math.PI / 2;
     fringe.position.set(MAP_SIZE / 2, 0.02, MAP_SIZE / 2);
     this.scene.add(fringe);
+
+    // seasonal weather particles drifting around the camera
+    this.snow = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(0.05, 4, 3),
+      new THREE.MeshBasicMaterial({ color: 0xf2f8ff, transparent: true, opacity: 0 }), 140);
+    this.leaves = new THREE.InstancedMesh(
+      new THREE.PlaneGeometry(0.16, 0.12),
+      new THREE.MeshBasicMaterial({ color: 0xd88a3a, transparent: true, opacity: 0, side: THREE.DoubleSide }), 80);
+    for (let i = 0; i < 140; i++) this.flakeSeeds.push(Math.random() * 1000);
+    this.scene.add(this.snow, this.leaves);
+  }
+
+  /** Drive the season clock from the authoritative sim tick (both players agree). */
+  setGameTick(tick: number): void {
+    this.seasonT = (tick / SEASON_TICKS) % 4;
+  }
+
+  private seasonWeight(k: number): number {
+    const d = Math.min(Math.abs(this.seasonT - k), 4 - Math.abs(this.seasonT - k));
+    return Math.max(0, 1 - d);
+  }
+
+  private seasonBlend(idx: 0 | 1 | 2): number {
+    let r = 0, g = 0, b = 0, total = 0;
+    for (let k = 0; k < 4; k++) {
+      const w = this.seasonWeight(k);
+      if (w <= 0) continue;
+      const c = SEASONS[k]![idx];
+      r += (c >> 16 & 255) * w; g += (c >> 8 & 255) * w; b += (c & 255) * w;
+      total += w;
+    }
+    return (Math.round(r / total) << 16) | (Math.round(g / total) << 8) | Math.round(b / total);
   }
 
   private resize(): void {
@@ -132,23 +179,68 @@ export class Stage {
     this.sun.position.set(this.follow.x + 40, 60, this.follow.z + 20);
     this.sun.target.position.set(this.follow.x, 0, this.follow.z);
 
-    // day/night grading
-    this.nightMix += (this.nightTarget - this.nightMix) * Math.min(1, dt * 0.8);
+    // day/night grading — slow blend through a warm dusk, not a hard fade
+    this.nightMix += (this.nightTarget - this.nightMix) * Math.min(1, dt * 0.35);
     const m = this.nightMix;
-    this.sun.intensity = 1.6 * (1 - m);
+    const dusk = Math.sin(m * Math.PI);              // peaks mid-transition
+    const seasonSun = this.seasonBlend(1);
+    const seasonSky = this.seasonBlend(2);
+    this.sun.intensity = 1.6 * (1 - m) + dusk * 0.15;
+    this.sun.color.setHex(lerpColor(seasonSun, 0xff8a45, dusk * 0.85));
     this.moon.intensity = 0.55 * m;
-    this.hemi.intensity = 0.65 - 0.42 * m;
-    this.hemi.color.setHex(lerpColor(0xcfe4ff, 0x4a6488, m));
+    this.hemi.intensity = 0.65 - 0.42 * m + dusk * 0.06;
+    this.hemi.color.setHex(lerpColor(lerpColor(seasonSky, 0xe8a070, dusk * 0.5), 0x4a6488, m));
     this.hemi.groundColor.setHex(lerpColor(0x3f5a2e, 0x16202c, m));
-    this.renderer.toneMappingExposure = 1.15 - 0.25 * m;
-    this.bloom.strength = 0.4 + 0.45 * m;          // emissives glow harder at night
+    this.renderer.toneMappingExposure = 1.15 - 0.25 * m + dusk * 0.05;
+    this.bloom.strength = 0.4 + 0.45 * m;            // emissives glow harder at night
     const fog = this.scene.fog as THREE.Fog;
-    fog.color.setHex(lerpColor(0xa8c4dc, 0x0a1018, m));
+    fog.color.setHex(lerpColor(lerpColor(0xa8c4dc, 0xd89060, dusk * 0.55), 0x0a1018, m));
     fog.near = 60 - 25 * m;
     fog.far = 140 - 55 * m;
-    this.renderer.setClearColor(lerpColor(0x9cbcd8, 0x070b12, m));
+    this.renderer.setClearColor(lerpColor(lerpColor(0x9cbcd8, 0xcf8a55, dusk * 0.5), 0x070b12, m));
+
+    // seasonal ground tint + weather particles
+    this.groundMat.color.setHex(this.seasonBlend(0));
+    this.updateWeather();
 
     this.composer.render();
+  }
+
+  private weatherTime = 0;
+  private updateWeather(): void {
+    this.weatherTime += 1 / 60;
+    const wWinter = this.seasonWeight(3);
+    const wAutumn = this.seasonWeight(2);
+    (this.snow.material as THREE.MeshBasicMaterial).opacity = wWinter * 0.9;
+    (this.leaves.material as THREE.MeshBasicMaterial).opacity = wAutumn * 0.85;
+    const m4 = new THREE.Matrix4();
+    if (wWinter > 0.01) {
+      for (let i = 0; i < 140; i++) {
+        const s = this.flakeSeeds[i]!;
+        const fall = ((this.weatherTime * (1.2 + (s % 1)) + s) % 1);
+        m4.setPosition(
+          this.follow.x + Math.sin(s * 7 + this.weatherTime * 0.5) * 2 + ((s * 13) % 30) - 15,
+          12 * (1 - fall),
+          this.follow.z + ((s * 29) % 26) - 13,
+        );
+        this.snow.setMatrixAt(i, m4);
+      }
+      this.snow.instanceMatrix.needsUpdate = true;
+    }
+    if (wAutumn > 0.01) {
+      for (let i = 0; i < 80; i++) {
+        const s = this.flakeSeeds[i]!;
+        const fall = ((this.weatherTime * (0.7 + (s % 0.6)) + s) % 1);
+        m4.makeRotationFromEuler(new THREE.Euler(s + this.weatherTime * 2, s * 2, s));
+        m4.setPosition(
+          this.follow.x + Math.sin(s * 5 + this.weatherTime) * 4 + ((s * 17) % 30) - 15,
+          10 * (1 - fall),
+          this.follow.z + ((s * 23) % 26) - 13,
+        );
+        this.leaves.setMatrixAt(i, m4);
+      }
+      this.leaves.instanceMatrix.needsUpdate = true;
+    }
   }
 }
 

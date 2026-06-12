@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { BUILDINGS, MAP_SIZE, type BuildingType, type Command } from '@lf/shared';
+import {
+  BUILDINGS, MAP_SIZE, inRiverBand, type BuildingType, type Command, type RiverParams,
+} from '@lf/shared';
 import type { Stage } from './render/scene';
 import type { BuildingView, NodeView } from './net';
 import { buildingModel } from './render/models';
@@ -15,6 +17,8 @@ export class Input {
   private ghost: THREE.Group | null = null;
   private ghostPlate: THREE.Mesh | null = null;
   private ghostRot = 0;
+  private rectAnchor: { x: number; y: number } | null = null;
+  private rectLine: THREE.Line | null = null;
 
   send: (cmd: Command) => void = () => {};
   ping: (pos: { x: number; y: number }) => void = () => {};
@@ -24,6 +28,7 @@ export class Input {
   onSelectAt: (cell: { x: number; y: number }) => void = () => {};
   buildings: BuildingView[] = [];
   nodes: NodeView[] = [];
+  riverP: RiverParams | null = null;
 
   constructor(private stage: Stage, private canvas: HTMLCanvasElement) {
     addEventListener('keydown', e => {
@@ -43,7 +48,12 @@ export class Input {
       if (e.altKey) { this.ping(w); return; }
       if (this.buildType) {
         this.mouse.down = true;
-        this.tryPlace(w);
+        if (BUILDINGS[this.buildType].size === 1) {
+          // drag → rectangle outline of walls; placement happens on release
+          this.rectAnchor = this.snap(w);
+        } else {
+          this.tryPlace(w);
+        }
         return;
       }
       // building under cursor → select; otherwise attack
@@ -56,7 +66,53 @@ export class Input {
       this.send({ kind: 'attack', dir: { x: w.x, y: w.y } });
       this.onAttack();
     });
-    addEventListener('pointerup', () => { this.mouse.down = false; this.lastPlacedCell = null; });
+    addEventListener('pointerup', e => {
+      if (this.rectAnchor && this.buildType) {
+        // place the full perimeter; the server builds as far as resources allow
+        const end = this.snap(this.stage.screenToWorld(e.clientX, e.clientY));
+        for (const cell of this.rectPerimeter(this.rectAnchor, end)) {
+          if (this.isValid(cell, 1)) this.send({ kind: 'build', type: this.buildType, pos: cell });
+        }
+      }
+      this.rectAnchor = null;
+      this.hideRectLine();
+      this.mouse.down = false;
+      this.lastPlacedCell = null;
+    });
+  }
+
+  private rectPerimeter(a: { x: number; y: number }, b: { x: number; y: number }): { x: number; y: number }[] {
+    const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
+    const y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+    const out: { x: number; y: number }[] = [];
+    for (let x = x0; x <= x1; x++) {
+      out.push({ x, y: y0 });
+      if (y1 !== y0) out.push({ x, y: y1 });
+    }
+    for (let y = y0 + 1; y < y1; y++) {
+      out.push({ x: x0, y });
+      if (x1 !== x0) out.push({ x: x1, y });
+    }
+    return out;
+  }
+
+  private hideRectLine(): void {
+    if (this.rectLine) { this.stage.scene.remove(this.rectLine); this.rectLine = null; }
+  }
+
+  private updateRectLine(a: { x: number; y: number }, b: { x: number; y: number }): void {
+    this.hideRectLine();
+    const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x) + 1;
+    const y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y) + 1;
+    const pts = [
+      new THREE.Vector3(x0, 0.12, y0), new THREE.Vector3(x1, 0.12, y0),
+      new THREE.Vector3(x1, 0.12, y1), new THREE.Vector3(x0, 0.12, y1),
+      new THREE.Vector3(x0, 0.12, y0),
+    ];
+    this.rectLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: 0x6fbf63 }));
+    this.stage.scene.add(this.rectLine);
   }
 
   /** Place at the snapped cell if free; dedupes while drag-painting walls. */
@@ -73,6 +129,8 @@ export class Input {
 
   setBuildType(type: BuildingType | null): void {
     this.buildType = type;
+    this.rectAnchor = null;
+    this.hideRectLine();
     if (this.ghost) { this.stage.scene.remove(this.ghost); this.ghost = null; this.ghostPlate = null; }
     if (!type) return;
     const model = buildingModel(type, 1);
@@ -119,6 +177,7 @@ export class Input {
       for (let x = cell.x; x < cell.x + size; x++) {
         if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return false;
         if (this.buildingAt({ x, y })) return false;
+        if (this.riverP && inRiverBand(x + 0.5, y + 0.5, this.riverP, 0.2)) return false;
         for (const n of this.nodes) {
           if (n.pos.x === x && n.pos.y === y) return false;
         }
@@ -141,14 +200,10 @@ export class Input {
   tick(): void {
     const { x: dx, y: dy } = this.dir;
     if (dx || dy) this.send({ kind: 'move', dir: { x: dx, y: dy } });
-    if (this.mouse.down) {
+    if (this.mouse.down && !this.buildType) {
       const w = this.stage.screenToWorld(this.mouse.x, this.mouse.y);
-      if (this.buildType) {
-        this.tryPlace(w);              // drag-paint walls
-      } else {
-        this.send({ kind: 'attack', dir: { x: w.x, y: w.y } });
-        this.onAttack();
-      }
+      this.send({ kind: 'attack', dir: { x: w.x, y: w.y } });
+      this.onAttack();
     }
     if (this.keys.has('r') && this.ghost) {
       this.ghostRot += Math.PI / 2;
@@ -162,6 +217,7 @@ export class Input {
     if (!this.ghost || !this.buildType) return;
     const w = this.stage.screenToWorld(this.mouse.x, this.mouse.y);
     const cell = this.snap(w);
+    if (this.rectAnchor) this.updateRectLine(this.rectAnchor, cell);
     const size = BUILDINGS[this.buildType].size;
     this.ghost.position.set(cell.x + size / 2, 0, cell.y + size / 2);
     const ok = this.isValid(cell, size);

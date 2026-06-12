@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
-  Rng, MAP_SIZE, CASTLE_POS, riverParams, riverYAt, RIVER_WIDTH, BRIDGE_XS,
+  Rng, MAP_SIZE, CASTLE_POS, riverParams, riverYAt, inRiverBand,
+  RIVER_WIDTH, BRIDGE_XS, type RiverParams,
 } from '@lf/shared';
 import type { NodeView } from '../net';
 
@@ -66,8 +67,11 @@ export class Environment {
   private time = 0;
   private occupied: { x: number; y: number; r: number }[] = [];
 
+  private riverPar: RiverParams;
+
   constructor(private scene: THREE.Scene, private seed: number, nodes: NodeView[]) {
     const rng = new Rng((seed ^ 0xdec0de) >>> 0);
+    this.riverPar = riverParams(seed);
     for (const n of nodes) this.occupied.push({ x: n.pos.x, y: n.pos.y, r: 1.5 });
 
     this.groundPatches(rng);
@@ -97,13 +101,19 @@ export class Environment {
 
   dispose(): void { this.scene.remove(this.root); }
 
-  /** Find a free spot in a radius band around the castle; marks it occupied. */
+  /** Dry land check: outside the river channel with margin. */
+  private dry(x: number, y: number, margin = 1.5): boolean {
+    return !inRiverBand(x, y, this.riverPar, margin);
+  }
+
+  /** Find a free dry spot in a radius band around the castle; marks it occupied. */
   private spot(rng: Rng, minR: number, maxR: number, clearance: number): { x: number; y: number } | null {
     for (let i = 0; i < 40; i++) {
       const a = rng.next() * Math.PI * 2;
       const r = minR + rng.next() * (maxR - minR);
       const x = CX + Math.cos(a) * r, y = CY + Math.sin(a) * r;
       if (x < 6 || y < 6 || x > MAP_SIZE - 6 || y > MAP_SIZE - 6) continue;
+      if (!this.dry(x, y, clearance)) continue;
       if (this.occupied.some(o => Math.hypot(o.x - x, o.y - y) < o.r + clearance)) continue;
       this.occupied.push({ x, y, r: clearance });
       return { x, y };
@@ -544,7 +554,7 @@ export class Environment {
       let placed = 0;
       for (let i = 0; i < total * 3 && placed < total; i++) {
         const x = 5 + rng.next() * (MAP_SIZE - 10), y = 5 + rng.next() * (MAP_SIZE - 10);
-        if (Math.hypot(x - CX, y - CY) < 8) continue;
+        if (Math.hypot(x - CX, y - CY) < 11 || !this.dry(x, y, 0.8)) continue;
         m4.makeRotationY(rng.next() * Math.PI);
         const s = 0.7 + rng.next() * 0.9;
         m4.scale(new THREE.Vector3(s, s, s));
@@ -563,7 +573,7 @@ export class Environment {
       let fp = 0;
       for (let i = 0; i < 270 && fp < 90; i++) {
         const x = 8 + rng.next() * (MAP_SIZE - 16), y = 8 + rng.next() * (MAP_SIZE - 16);
-        if (Math.hypot(x - CX, y - CY) < 10) continue;
+        if (Math.hypot(x - CX, y - CY) < 12 || !this.dry(x, y, 0.8)) continue;
         m4.identity();
         m4.setPosition(x, 0.1, y);
         flowers.setMatrixAt(fp++, m4);
@@ -584,7 +594,7 @@ export class Environment {
       let placed = 0;
       for (let i = 0; i < total * 3 && placed < total; i++) {
         const x = 5 + rng.next() * (MAP_SIZE - 10), y = 5 + rng.next() * (MAP_SIZE - 10);
-        if (Math.hypot(x - CX, y - CY) < 9) continue;
+        if (Math.hypot(x - CX, y - CY) < 12 || !this.dry(x, y, 1)) continue;
         if (this.occupied.some(o => Math.hypot(o.x - x, o.y - y) < 1.2)) continue;
         const s = 0.5 + rng.next() * 0.8;
         m4.makeRotationY(rng.next() * Math.PI);
@@ -599,9 +609,9 @@ export class Environment {
     const pebbleGeo = new THREE.DodecahedronGeometry(0.12, 0);
     const pebbles = new THREE.InstancedMesh(pebbleGeo, mat(0x7d8087), 220);
     let pp = 0;
-    for (let i = 0; i < 660 && pp < 220; i++) {
+    for (let i = 0; i < 660 && pp < 150; i++) {
       const x = 4 + rng.next() * (MAP_SIZE - 8), y = 4 + rng.next() * (MAP_SIZE - 8);
-      if (Math.hypot(x - CX, y - CY) < 7) continue;
+      if (Math.hypot(x - CX, y - CY) < 11 || !this.dry(x, y, 0.6)) continue;
       const s = 0.5 + rng.next();
       m4.makeRotationY(rng.next() * Math.PI);
       m4.scale(new THREE.Vector3(s, s * 0.7, s));

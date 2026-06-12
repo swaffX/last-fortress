@@ -313,6 +313,42 @@ button { font-family: inherit; cursor: pointer; }
 
 /* game-over flourish */
 .gameover-wave { font-family: var(--font-display); font-size: 4rem; color: var(--ember); line-height: 1; }
+.restart-row { display: flex; gap: 14px; }
+.restart-votes { color: var(--gold); font-weight: 700; letter-spacing: 0.1em; }
+
+/* interaction prompt */
+.interact-prompt {
+  position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%);
+  padding: 8px 18px; background: rgba(13, 20, 32, 0.9); clip-path: var(--chamfer-sm);
+  border: 1px solid var(--ember); font-weight: 700; letter-spacing: 0.06em;
+  pointer-events: none; animation: fade-up 0.2s both;
+}
+
+/* wave-upgrade vote overlay */
+.choice-overlay {
+  position: absolute; top: 16%; left: 50%; transform: translateX(-50%);
+  text-align: center; pointer-events: auto;
+}
+.choice-title {
+  font-family: var(--font-display); font-weight: 900; font-size: 1.7rem;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold);
+  text-shadow: 0 0 22px rgba(232, 182, 76, 0.4), 0 2px 0 #000;
+}
+.choice-sub { color: var(--steel); font-size: 0.75rem; letter-spacing: 0.25em; text-transform: uppercase; margin: 4px 0 14px; }
+.choice-cards { display: flex; gap: 12px; }
+.choice-card {
+  width: 190px; padding: 16px 14px; background: rgba(13, 20, 32, 0.92);
+  clip-path: var(--chamfer); border: none; color: var(--parchment);
+  box-shadow: inset 0 0 0 1px var(--night-3); transition: all 0.15s ease;
+  animation: fade-up 0.4s both;
+}
+.choice-card:nth-child(2) { animation-delay: 0.08s; }
+.choice-card:nth-child(3) { animation-delay: 0.16s; }
+.choice-card:hover { transform: translateY(-4px); box-shadow: inset 0 0 0 1px var(--ember), 0 8px 24px rgba(0,0,0,0.5); }
+.choice-card.picked { box-shadow: inset 0 0 0 2px var(--gold); background: rgba(232, 182, 76, 0.1); }
+.choice-card .nm { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.06em; margin-bottom: 6px; }
+.choice-card .ds { font-size: 0.78rem; color: var(--steel); line-height: 1.35; }
+.choice-card .vt { margin-top: 8px; min-height: 1.2em; font-size: 1rem; }
 
 /* upgrade tooltip panel */
 .sel-panel {

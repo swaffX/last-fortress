@@ -8,6 +8,7 @@ export function serializeState(s: SimState): string {
     enemies: [...s.enemies.entries()],
     players: [...s.players.entries()],
     nodes: [...s.nodes.entries()],
+    projectiles: [...s.projectiles.entries()],
   });
 }
 
@@ -19,5 +20,6 @@ export function deserializeState(json: string): SimState {
     enemies: new Map(raw.enemies),
     players: new Map(raw.players),
     nodes: new Map(raw.nodes),
+    projectiles: new Map(raw.projectiles),
   };
 }

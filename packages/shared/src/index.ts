@@ -9,9 +9,10 @@ export { BUILDINGS, type BuildingDef, type TierStats } from './sim/data/building
 export { ENEMIES, type EnemyDef } from './sim/data/enemies';
 export { waveComposition, enemyHpScale, enemyDmgScale } from './sim/data/waves';
 export { SKILLS, applySkills, defaultModifiers, type SkillDef, type SkillModifiers, type SkillBranch } from './sim/data/skills';
+export { UPGRADE_CHOICES, type UpgradeDef } from './sim/data/upgrades';
 export { serializeState, deserializeState } from './sim/snapshot';
 export { dist, buildingCenter, nearestEnemy } from './sim/combat';
 export {
-  riverParams, riverYAt, inRiver, onBridge,
+  riverParams, riverYAt, inRiver, inRiverBand, onBridge, crossesBridgeRail,
   RIVER_WIDTH, BRIDGE_XS, BRIDGE_HALF_WIDTH, type RiverParams,
 } from './sim/river';

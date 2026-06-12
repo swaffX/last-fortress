@@ -76,6 +76,9 @@ export class Screens {
     this.root.querySelector('#start-btn')?.addEventListener('click', () => this.onStart());
   }
 
+  onRestartVote: () => void = () => {};
+  onMainMenu: () => void = () => {};
+
   gameOver(wave: number, coins: number, skillPoints: number): void {
     this.root.innerHTML = `
       <div class="screen">
@@ -85,9 +88,23 @@ export class Screens {
           <div class="stat-cell"><div class="v">${coins}</div><div class="k">Coins Earned</div></div>
           <div class="stat-cell"><div class="v">+${skillPoints}</div><div class="k">Skill Points</div></div>
         </div>
-        <button class="btn" id="again-btn">Return to Menu</button>
+        <div class="restart-row">
+          <button class="btn" id="again-btn">Try Again</button>
+          <button class="btn ghost" id="menu-btn">Main Menu</button>
+        </div>
+        <div class="restart-votes" id="restart-votes"></div>
+        <div class="subtitle">Restart needs every player's vote — Main Menu dissolves the lobby</div>
       </div>`;
-    (this.root.querySelector('#again-btn') as HTMLElement).onclick = () => this.onPlayAgain();
+    (this.root.querySelector('#again-btn') as HTMLElement).onclick = () => {
+      this.onRestartVote();
+      (this.root.querySelector('#again-btn') as HTMLButtonElement).disabled = true;
+    };
+    (this.root.querySelector('#menu-btn') as HTMLElement).onclick = () => this.onMainMenu();
+  }
+
+  setRestartVotes(votes: number, needed: number): void {
+    const el = this.root.querySelector('#restart-votes');
+    if (el) el.textContent = `Try Again: ${votes}/${needed}`;
   }
 
   /** Skill tree overlay. inGame=true renders over the HUD. */

@@ -1,5 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
+import { riverParams } from '@lf/shared';
 import { Net, type ServerMsg, type ProfileView, type BuildingView, type NodeView } from './net';
 import { Stage } from './render/scene';
 import { World } from './render/world';
@@ -33,6 +34,9 @@ screens.onJoin = (code, klass) => { audio.unlock(); net.send({ t: 'join_lobby', 
 screens.onStart = () => net.send({ t: 'start_game' });
 screens.onUnlockSkill = id => net.send({ t: 'unlock_skill', skillId: id });
 screens.onPlayAgain = () => location.reload();
+screens.onRestartVote = () => net.send({ t: 'restart_vote' });
+screens.onMainMenu = () => { net.send({ t: 'leave' }); screens.menu(profile); };
+hud.onVote = option => net.send({ t: 'vote', option });
 
 // ---- wiring: hud/input → net ----
 hud.onBuildSelect = type => input.setBuildType(type);
@@ -72,13 +76,17 @@ net.on((msg: ServerMsg) => {
     case 'game_start':
       inGame = true;
       selfId = msg.selfId;
+      world.reset();
       world.selfId = msg.selfId;
       world.setSeed(msg.seed);
+      input.riverP = riverParams(msg.seed);
+      hud.hideChoice();
       lastNodes = msg.nodes;
       world.setNodes(msg.nodes);
       input.nodes = msg.nodes;
       env?.dispose();
       env = new Environment(stage.scene, msg.seed, msg.nodes);
+      hud.initMinimapTerrain(msg.seed, msg.nodes);
       screens.clear();
       hud.show();
       hud.banner('The Watch Begins', false);
@@ -87,16 +95,24 @@ net.on((msg: ServerMsg) => {
     case 'frame': {
       lastFrameBuildings = msg.buildings;
       input.buildings = msg.buildings;
+      world.colliders = { buildings: msg.buildings, nodes: lastNodes };
       // node depletion: drop rendered nodes the sim no longer reports via gather
-      world.applyFrame(msg.players, msg.enemies, msg.buildings);
+      world.applyFrame(msg.players, msg.enemies, msg.buildings, msg.projectiles);
       for (const e of msg.events) {
         if (e.kind === 'projectile') world.aimTower(e.from, e.to);
         if (e.kind === 'melee') world.lungePlayerAt(e.pos.x, e.pos.y);
+        if (e.kind === 'node_depleted') {
+          world.removeNode(e.nodeId);
+          lastNodes = lastNodes.filter(n => n.id !== e.nodeId);
+          input.nodes = lastNodes;
+          hud.removeMinimapNode(e.nodeId);
+        }
       }
       effects.handle(msg.events);
       audio.handle(msg.events);
       audio.setPhase(msg.phase);
       stage.setNight(msg.phase === 'night');
+      stage.setGameTick(msg.tick);
       const castle = msg.buildings.find(b => b.type === 'castle');
       hud.updateFrame(msg.wave, msg.phase, msg.phaseTicks, msg.resources,
         msg.players, msg.enemies, msg.buildings, castle?.tier ?? 1, selfId);
@@ -107,10 +123,30 @@ net.on((msg: ServerMsg) => {
       hud.notify(`📍 ${msg.from} pinged`);
       break;
     }
+    case 'choice_offer':
+      hud.showChoice(msg.options);
+      audio.handle([{ kind: 'wave_start', wave: 0, boss: false }]);  // fanfare
+      break;
+    case 'choice_state':
+      hud.updateChoiceVotes(msg.votes);
+      break;
+    case 'choice_applied':
+      hud.hideChoice();
+      hud.notify(`⚜ ${msg.option.name} — ${msg.option.desc}`);
+      break;
     case 'game_over':
       inGame = false;
       hud.hide();
+      hud.hideChoice();
       screens.gameOver(msg.wave, msg.coinsEarned, msg.skillPointsEarned);
+      break;
+    case 'restart_state':
+      screens.setRestartVotes(msg.votes, msg.needed);
+      break;
+    case 'lobby_closed':
+      inGame = false;
+      hud.hide();
+      screens.menu(profile);
       break;
     case 'error':
       screens.toast(msg.message);
@@ -131,6 +167,10 @@ addEventListener('keydown', e => {
   if (!inGame || e.target instanceof HTMLInputElement) return;
   const n = Number(e.key);
   if (n >= 1 && n <= 9) hud.buildByIndex(n - 1);
+  if (e.key.toLowerCase() === 'e') {
+    net.send({ t: 'cmd', cmd: { kind: 'gather' } });
+    world.lunge(selfId);
+  }
   if (e.key === 'Escape') { hud.clearBuild(); hud.selectBuilding(null); }
   if (e.key.toLowerCase() === 'k' && profile) screens.skillTree(profile, true);
   if (e.key.toLowerCase() === 'u' && hud.selected !== null) {
@@ -149,7 +189,19 @@ function loop(now: number): void {
   world.render(dt);
   // camera follows the predicted self position every display frame (no tick stutter)
   const selfPos = world.positionOf(selfId);
-  if (selfPos) stage.setFollow(selfPos.x, selfPos.z);
+  if (selfPos) {
+    stage.setFollow(selfPos.x, selfPos.z);
+    // gather prompt when a tree/rock is in reach
+    if (inGame) {
+      let near: NodeView | null = null;
+      let nd = 2.2;
+      for (const n of lastNodes) {
+        const d = Math.hypot(n.pos.x + 0.5 - selfPos.x, n.pos.y + 0.5 - selfPos.z);
+        if (d <= nd) { nd = d; near = n; }
+      }
+      hud.showPrompt(near ? `[E] Gather ${near.kind === 'tree' ? 'wood' : 'stone'}` : null);
+    }
+  }
   effects.update(dt);
   env?.update(dt);
   input.updateGhost();

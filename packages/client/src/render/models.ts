@@ -339,46 +339,108 @@ export function buildingModel(type: BuildingType, tier: number): THREE.Group {
     }
     case 'castle': {
       const lvl = tier; // 1..5
-      const h = 2.2 + lvl * 0.5;
-      const keep = new THREE.Mesh(new THREE.BoxGeometry(3.4, h, 3.4), stoneMat(0xd2d8e0));
-      keep.position.y = h / 2;
-      const g = group(
-        keep,
-        at(box(3.7, 0.3, 3.7, STONE_DARK), 0, h, 0),
-        crenels(3.7, h + 0.3, STONE_DARK, 3.7),
-        at(box(0.9, 1.3, 0.16, WOOD_DARK), 0, 0.65, 1.72),          // gate door
-        at(box(1.1, 0.16, 0.3, IRON), 0, 1.35, 1.72),               // lintel
-      );
+      const h = 2.4 + lvl * 0.5;
+      const g = new THREE.Group();
       const flags: THREE.Mesh[] = [];
+      const pulse: THREE.Mesh[] = [];
+
+      // stepped stone plinth grounds the silhouette
+      g.add(at(new THREE.Mesh(new THREE.BoxGeometry(3.95, 0.3, 3.95), stoneMat(0x9aa2ac)), 0, 0.15, 0));
+      g.add(at(new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.25, 3.7), stoneMat(0xb4bcc6)), 0, 0.42, 0));
+
+      // main keep with corner buttresses
+      const keep = new THREE.Mesh(new THREE.BoxGeometry(3.3, h, 3.3), stoneMat(0xd2d8e0));
+      keep.position.y = h / 2 + 0.4;
+      g.add(keep);
+      for (const [bx, bz] of [[-1.45, 0], [1.45, 0], [0, -1.45]] as const) {
+        const but = new THREE.Mesh(new THREE.BoxGeometry(bx === 0 ? 1 : 0.5, h * 0.7, bz === 0 ? 1 : 0.5),
+          stoneMat(0xbfc7d1));
+        but.position.set(bx, h * 0.35 + 0.4, bz);
+        g.add(but);
+      }
+      // walkway ring + battlements
+      g.add(at(box(3.7, 0.28, 3.7, STONE_DARK), 0, h + 0.4, 0));
+      const cren = crenels(3.7, h + 0.68, STONE_DARK, 3.7);
+      g.add(cren);
+      const crenSide = crenels(3.7, h + 0.68, STONE_DARK, 0.24);
+      crenSide.rotation.y = Math.PI / 2;
+      g.add(crenSide);
+
+      // gatehouse: twin drum towers flanking an arched gate with portcullis
+      for (const gx of [-0.85, 0.85]) {
+        const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, h * 0.75, 8), stoneMat(0xc8cfd8));
+        drum.position.set(gx, h * 0.37 + 0.4, 1.7);
+        const dcap = cone(0.52, 0.6, ROOF, h * 0.75 + 0.65, 8);
+        dcap.position.set(gx, h * 0.75 + 0.68, 1.7);
+        g.add(drum, dcap);
+      }
+      g.add(at(box(1.1, 1.5, 0.2, WOOD_DARK), 0, 1.15, 1.78));          // gate door
+      for (let i = -2; i <= 2; i++) {                                   // portcullis bars
+        g.add(at(box(0.05, 1.3, 0.04, IRON), i * 0.2, 1.2, 1.9));
+      }
+      g.add(at(box(0.05, 0.05, 0.04, IRON), 0, 1.6, 1.9));
+      g.add(at(box(1.3, 0.22, 0.34, IRON), 0, 2.0, 1.82));              // lintel
+      // braziers at the gate — warm glow
+      for (const gx of [-1.3, 1.3]) {
+        const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.08, 0.14, 6), mat(0x3a3f45));
+        bowl.position.set(gx, 0.95, 2.05);
+        const fire = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.24, 5), mat(0xffaa33, 0xff8c3b));
+        fire.position.set(gx, 1.12, 2.05);
+        g.add(at(cyl(0.04, 0.05, 0.85, IRON, 0.45), gx, 0, 2.05), bowl, fire);
+        pulse.push(fire);
+      }
+
+      // corner towers: taller drums, tiled conical roofs, arrow slits
       for (const [dx, dz] of [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]]) {
-        const tw = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, h + 0.8, 8), stoneMat(0xc8cfd8));
-        tw.position.set(dx!, (h + 0.8) / 2, dz!);
-        const cap = cone(0.55, 0.7, ROOF, h + 1.15, 6);
-        cap.position.set(dx!, h + 1.15, dz!);
-        g.add(tw, cap);
+        const th = h + 1.1;
+        const tw = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.6, th, 8), stoneMat(0xc8cfd8));
+        tw.position.set(dx!, th / 2 + 0.3, dz!);
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.14, 8), stoneMat(0x9aa2ac));
+        ring.position.set(dx!, th + 0.3, dz!);
+        const cap = cone(0.62, 0.85, ROOF, th + 0.85, 8);
+        cap.position.set(dx!, th + 0.85, dz!);
+        const tip = at(new THREE.Mesh(new THREE.SphereGeometry(0.07, 5, 4), mat(GOLD)), dx!, th + 1.32, dz!);
+        g.add(tw, ring, cap, tip);
+        g.add(at(box(0.08, 0.32, 0.05, 0x1a222e), dx! * 1.02, th * 0.6, dz! + (dz! > 0 ? 0.56 : -0.56)));
         if (lvl >= 2) {
           const b = banner(1);
-          b.position.set(dx!, h + 1.4, dz!);
+          b.position.set(dx!, th + 0.85, dz!);
           g.add(b);
           flags.push(b.userData.flagMesh as THREE.Mesh);
         }
       }
-      // window slits, emissive — lit from within
-      for (const dz of [1.71, -1.71]) {
-        for (const dx of [-0.9, 0.9]) {
-          g.add(at(box(0.16, 0.4, 0.04, 0xffd9a0), dx, h * 0.6, dz));
+
+      // lit windows on every face
+      for (const dz of [1.67, -1.67]) {
+        for (const dx of [-0.55, 0.55]) {
+          g.add(at(box(0.18, 0.45, 0.05, 0xffd9a0, 0), dx, h * 0.62 + 0.4, dz));
         }
       }
-      if (lvl >= 3) g.add(cone(0.8, 1.2, ROOF, h + 0.9, 6));
-      if (lvl >= 4) g.add(at(cyl(0.6, 0.7, h + 1.4, STONE), 0, (h + 1.4) / 2, 0),
-                          cone(0.75, 0.9, ROOF, h + 1.85, 6));
-      if (lvl >= 5) {
-        const orb = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), mat(GOLD, GOLD));
-        orb.position.y = h + 2.6;
-        g.add(orb);
-        g.userData.pulse = [orb];
+      for (const dx of [1.67, -1.67]) {
+        g.add(at(box(0.05, 0.45, 0.18, 0xffd9a0, 0), dx, h * 0.62 + 0.4, 0));
       }
+
+      // levels 3+: tiled inner roof; 4+: tall central spire; 5: radiant golden orb
+      if (lvl >= 3) g.add(cone(1.3, 1.1, ROOF, h + 0.95, 4));
+      if (lvl >= 4) {
+        const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, h + 1.7, 8), stoneMat(0xd2d8e0));
+        spire.position.y = (h + 1.7) / 2 + 0.4;
+        g.add(spire, cone(0.68, 1, ROOF, h + 2.4, 8));
+        const sb = banner(1.2);
+        sb.position.set(0, h + 2.7, 0);
+        g.add(sb);
+        flags.push(sb.userData.flagMesh as THREE.Mesh);
+      }
+      if (lvl >= 5) {
+        const orb = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), mat(GOLD, GOLD));
+        orb.position.y = h + 3.3;
+        g.add(orb);
+        pulse.push(orb);
+      }
+
+      g.traverse(o => { if (o instanceof THREE.Mesh) { o.castShadow = true; o.receiveShadow = true; } });
       g.userData.flags = flags;
+      g.userData.pulse = pulse;
       return g;
     }
   }
@@ -593,6 +655,41 @@ export function playerModel(klass: ClassType): THREE.Group {
  * Three tree species with per-instance hue jitter so forests read as organic.
  * variant: 0 = pine, 1 = oak (blobby crown), 2 = tall fir.
  */
+/** In-flight projectile meshes — oriented along +Z by the heading system. */
+export function projectileModel(kind: 'arrow' | 'bolt' | 'spit' | 'bomb'): THREE.Group {
+  switch (kind) {
+    case 'arrow': {
+      const shaft = box(0.035, 0.035, 0.55, 0x8a6238, 0);
+      const head = cone(0.04, 0.12, 0x9aa3ab, 0, 4);
+      head.rotation.x = Math.PI / 2;
+      head.position.z = 0.32;
+      const fletch = box(0.09, 0.02, 0.1, 0xd8d0c0, 0);
+      fletch.position.z = -0.24;
+      return group(shaft, head, fletch);
+    }
+    case 'bolt': {
+      const shaft = box(0.05, 0.05, 0.42, 0x4a4038, 0);
+      const head = cone(0.05, 0.12, 0xc9d2da, 0, 4);
+      head.rotation.x = Math.PI / 2;
+      head.position.z = 0.26;
+      return group(shaft, head);
+    }
+    case 'spit': {
+      const blob = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), mat(0x8fdc4a, 0x8fdc4a));
+      blob.scale.z = 1.4;
+      return group(blob);
+    }
+    case 'bomb': {
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), mat(0x2b2b30));
+      const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 4), mat(0xb8742a));
+      fuse.position.y = 0.2;
+      const spark = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 3), mat(0xffaa33, 0xff8c3b));
+      spark.position.y = 0.27;
+      return group(shell, fuse, spark);
+    }
+  }
+}
+
 export function treeModel(variant = 0, jitter = 0): THREE.Group {
   const leafColor = new THREE.Color(LEAF).offsetHSL(jitter * 0.06 - 0.03, jitter * 0.15 - 0.05, jitter * 0.1 - 0.05).getHex();
   const leafColor2 = new THREE.Color(0x4a8a3d).offsetHSL(jitter * 0.05 - 0.025, 0, jitter * 0.08 - 0.04).getHex();
