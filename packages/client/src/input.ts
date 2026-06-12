@@ -19,6 +19,8 @@ export class Input {
   send: (cmd: Command) => void = () => {};
   ping: (pos: { x: number; y: number }) => void = () => {};
   onAttack: () => void = () => {};
+  onBuildCancel: () => void = () => {};
+  private lastPlacedCell: string | null = null;
   onSelectAt: (cell: { x: number; y: number }) => void = () => {};
   buildings: BuildingView[] = [];
   nodes: NodeView[] = [];
@@ -31,15 +33,17 @@ export class Input {
     addEventListener('keyup', e => this.keys.delete(e.key.toLowerCase()));
     addEventListener('blur', () => this.keys.clear());
     canvas.addEventListener('pointermove', e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
+    canvas.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (this.buildType) this.onBuildCancel();   // right-click exits build mode
+    });
     canvas.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       const w = this.stage.screenToWorld(e.clientX, e.clientY);
       if (e.altKey) { this.ping(w); return; }
       if (this.buildType) {
-        const cell = this.snap(w);
-        if (this.isValid(cell, BUILDINGS[this.buildType].size)) {
-          this.send({ kind: 'build', type: this.buildType, pos: cell });
-        }
+        this.mouse.down = true;
+        this.tryPlace(w);
         return;
       }
       // building under cursor → select; otherwise attack
@@ -48,8 +52,23 @@ export class Input {
       if (hit) { this.onSelectAt(cell); return; }
       this.mouse.down = true;
       this.onSelectAt({ x: -1, y: -1 });  // deselect
+      // fire immediately — waiting for the 50 ms tick swallows quick clicks
+      this.send({ kind: 'attack', dir: { x: w.x, y: w.y } });
+      this.onAttack();
     });
-    addEventListener('pointerup', () => { this.mouse.down = false; });
+    addEventListener('pointerup', () => { this.mouse.down = false; this.lastPlacedCell = null; });
+  }
+
+  /** Place at the snapped cell if free; dedupes while drag-painting walls. */
+  private tryPlace(w: { x: number; y: number }): void {
+    if (!this.buildType) return;
+    const cell = this.snap(w);
+    const key = `${cell.x},${cell.y}`;
+    if (key === this.lastPlacedCell) return;
+    if (this.isValid(cell, BUILDINGS[this.buildType].size)) {
+      this.send({ kind: 'build', type: this.buildType, pos: cell });
+      this.lastPlacedCell = key;
+    }
   }
 
   setBuildType(type: BuildingType | null): void {
@@ -122,10 +141,14 @@ export class Input {
   tick(): void {
     const { x: dx, y: dy } = this.dir;
     if (dx || dy) this.send({ kind: 'move', dir: { x: dx, y: dy } });
-    if (this.mouse.down && !this.buildType) {
+    if (this.mouse.down) {
       const w = this.stage.screenToWorld(this.mouse.x, this.mouse.y);
-      this.send({ kind: 'attack', dir: { x: w.x, y: w.y } });
-      this.onAttack();
+      if (this.buildType) {
+        this.tryPlace(w);              // drag-paint walls
+      } else {
+        this.send({ kind: 'attack', dir: { x: w.x, y: w.y } });
+        this.onAttack();
+      }
     }
     if (this.keys.has('r') && this.ghost) {
       this.ghostRot += Math.PI / 2;

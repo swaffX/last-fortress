@@ -30,6 +30,7 @@ export class Audio {
         case 'projectile':
           if (e.weapon === 'arrow' || e.weapon === 'bolt') this.sfx('arrow', () => this.arrow());
           else if (e.weapon === 'ice') this.sfx('ice', () => this.ice());
+          else if (e.weapon === 'spit') this.sfx('spit', () => this.spit());
           break;
         case 'explosion': this.sfx('boom', () => this.boom()); break;
         case 'chain': this.sfx('zap', () => this.zap()); break;
@@ -117,6 +118,17 @@ export class Audio {
     const o = this.osc('sawtooth', 880, g, 0.15);
     o.frequency.exponentialRampToValueAtTime(140, this.ctx.currentTime + 0.14);
   }
+  private spit(): void {
+    if (!this.ctx) return;
+    const g = this.env(0.2, 0.07);
+    const o = this.osc('sine', 520, g, 0.2);
+    o.frequency.exponentialRampToValueAtTime(180, this.ctx.currentTime + 0.18);
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = 700;
+    f.connect(this.env(0.15, 0.05));
+    this.noise(0.15, f);
+  }
+
   private growl(): void {
     if (!this.ctx) return;
     const g = this.env(0.3, 0.1);

@@ -309,15 +309,36 @@ export function buildingModel(type: BuildingType, tier: number): THREE.Group {
   }
 }
 
+/** ground ring color per enemy type — instant silhouette readability */
+const RING_COLORS: Record<EnemyType, number> = {
+  normal: 0x8aa84f, fast: 0xcfe06a, tank: 0x4f6b45,
+  spitter: 0x6fd86a, exploding: 0xff7733, butcher: 0xc43a31,
+};
+
 export function enemyModel(type: EnemyType): THREE.Group {
+  const g = enemyBody(type);
+  // type-colored ring under the feet
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.5, 0.66, 12),
+    new THREE.MeshBasicMaterial({
+      color: RING_COLORS[type], transparent: true, opacity: 0.45, depthWrite: false,
+    }));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.05;
+  ring.scale.setScalar(type === 'butcher' ? 1.8 : type === 'tank' ? 1.3 : 1);
+  g.add(ring);
+  return g;
+}
+
+function enemyBody(type: EnemyType): THREE.Group {
   switch (type) {
-    case 'normal': return zombie(0x6f8f57, 0.5);
-    case 'fast': return zombie(0x8fae5a, 0.4, { lean: 0.5 });
-    case 'tank': return zombie(0x4f6b45, 0.85, { bigArms: true });
-    case 'spitter': return zombie(0x7da05f, 0.5, { head: 0x9fce6a, sack: true });
-    case 'exploding': return zombie(0xb86f3a, 0.5, { head: 0xe85b2a, glow: true });
+    case 'normal': return zombie(0x6f8f57, 0.6);
+    case 'fast': return zombie(0x8fae5a, 0.5, { lean: 0.5 });
+    case 'tank': return zombie(0x4f6b45, 1.0, { bigArms: true });
+    case 'spitter': return zombie(0x7da05f, 0.6, { head: 0x9fce6a, sack: true });
+    case 'exploding': return zombie(0xb86f3a, 0.6, { head: 0xe85b2a, glow: true });
     case 'butcher': {
-      const g = zombie(0x5d4a4a, 1.5, { bigArms: true });
+      const g = zombie(0x5d4a4a, 1.7, { bigArms: true });
       const blade = box(0.2, 1.4, 0.5, 0x9aa3ab, 0.2);
       blade.position.x = 0.55;
       // attach cleaver to right arm so attack lunge swings it
@@ -341,6 +362,10 @@ function zombie(color: number, scale: number,
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), headMat);
   head.position.y = 1.42;
   head.rotation.z = 0.12;
+  // glowing red eyes — readable even at night
+  for (const ex of [-0.1, 0.1]) {
+    head.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.02), mat(0xff2a1a, 0xff2a1a)), ex, 0.05, 0.22));
+  }
 
   const legL = box(0.18, 0.55, 0.18, color, -0.26);
   legL.position.set(-0.18, 0.55, 0);

@@ -44,6 +44,7 @@ hud.onDemolish = id => {
 input.send = cmd => net.send({ t: 'cmd', cmd });
 input.ping = pos => net.send({ t: 'ping', pos });
 input.onAttack = () => world.lunge(selfId);
+input.onBuildCancel = () => hud.clearBuild();
 input.onSelectAt = cell => {
   const b = lastFrameBuildings.find(bb => {
     const s = bb.type === 'castle' ? 4 : 2;

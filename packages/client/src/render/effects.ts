@@ -10,13 +10,20 @@ interface Particle {
   gravity: number;
 }
 interface Beam { line: THREE.Line; life: number; }
+interface Ring { mesh: THREE.Mesh; life: number; maxLife: number; maxScale: number; }
+interface Flash { mesh: THREE.Mesh; life: number; }
 
 /** Pooled particle and beam effects driven by SimEvents. */
 export class Effects {
   private pool: Particle[] = [];
   private active: Particle[] = [];
   private beams: Beam[] = [];
+  private rings: Ring[] = [];
+  private flashes: Flash[] = [];
   private geo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+  private flashGeo = new THREE.SphereGeometry(0.16, 6, 5);
+  private ringGeo = new THREE.RingGeometry(0.9, 1, 20);
+  private bloodBudget = 0;
 
   constructor(private scene: THREE.Scene, private stage: Stage) {}
 
@@ -25,14 +32,27 @@ export class Effects {
       switch (e.kind) {
         case 'projectile': {
           const color = e.weapon === 'ice' ? 0x7cc7e8 : e.weapon === 'bomb' ? 0x2b2b30
-            : e.weapon === 'bolt' ? 0xc9d2da : 0xd9b88a;
+            : e.weapon === 'bolt' ? 0xc9d2da : e.weapon === 'spit' ? 0x8fdc4a : 0xd9b88a;
           this.tracer(e.from.x, e.from.y, e.to.x, e.to.y, color);
+          // muzzle flash at origin, impact burst at target
+          if (e.weapon !== 'spit') this.flash(e.from.x, 1.6, e.from.y, 0xffd9a0);
+          this.burst(e.to.x, e.to.y, color, e.weapon === 'spit' ? 5 : 3, 0.25, 1.8);
           break;
         }
         case 'explosion':
           this.burst(e.pos.x, e.pos.y, 0xff8c3b, Math.round(10 * e.radius), 0.5, 5);
+          this.burst(e.pos.x, e.pos.y, 0xffd24a, Math.round(5 * e.radius), 0.3, 6);
           this.burst(e.pos.x, e.pos.y, 0x57514a, Math.round(6 * e.radius), 0.9, 3);
+          this.shockwave(e.pos.x, e.pos.y, e.radius * 1.6, 0xffaa55);
+          this.flash(e.pos.x, 0.7, e.pos.y, 0xffe9b0);
           this.stage.addShake(0.25 + e.radius * 0.1);
+          break;
+        case 'damage':
+          // light blood spritz, budgeted so hordes don't drown the GPU
+          if (this.bloodBudget > 0 && e.amount >= 8) {
+            this.bloodBudget--;
+            this.burst(e.pos.x, e.pos.y, 0x8a2f25, 3, 0.35, 2.2);
+          }
           break;
         case 'chain': {
           for (let i = 0; i + 1 < e.points.length; i++) {
@@ -42,14 +62,21 @@ export class Effects {
         }
         case 'death':
           this.burst(e.pos.x, e.pos.y, 0x8a2f25, 8, 0.6, 3.5);
-          if (e.enemy === 'butcher') this.stage.addShake(0.8);
+          this.burst(e.pos.x, e.pos.y, 0x5d6b48, 4, 0.5, 2.5);
+          if (e.enemy === 'butcher') {
+            this.stage.addShake(0.8);
+            this.shockwave(e.pos.x, e.pos.y, 4, 0xc43a31);
+          }
           break;
         case 'building_destroyed':
           this.burst(e.pos.x + 0.5, e.pos.y + 0.5, 0x8d9299, 14, 0.9, 4);
+          this.burst(e.pos.x + 0.5, e.pos.y + 0.5, 0x5e4023, 8, 0.7, 3);
+          this.shockwave(e.pos.x + 0.5, e.pos.y + 0.5, 2.2, 0x8d9299);
           this.stage.addShake(0.3);
           break;
         case 'build_placed':
           this.burst(e.pos.x + 0.5, e.pos.y + 0.5, 0xd9b88a, 8, 0.4, 2.5);
+          this.shockwave(e.pos.x + 0.5, e.pos.y + 0.5, 1.4, 0xd9b88a);
           break;
       }
     }
@@ -81,6 +108,26 @@ export class Effects {
     }
   }
 
+  /** expanding fading ring on the ground */
+  private shockwave(x: number, z: number, maxScale: number, color: number): void {
+    const mesh = new THREE.Mesh(this.ringGeo,
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, depthWrite: false }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, 0.08, z);
+    mesh.scale.setScalar(0.1);
+    this.scene.add(mesh);
+    this.rings.push({ mesh, life: 0.45, maxLife: 0.45, maxScale });
+  }
+
+  /** brief glowing sphere (muzzle flash / explosion core) */
+  private flash(x: number, y: number, z: number, color: number): void {
+    const mesh = new THREE.Mesh(this.flashGeo,
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }));
+    mesh.position.set(x, y, z);
+    this.scene.add(mesh);
+    this.flashes.push({ mesh, life: 0.09 });
+  }
+
   private tracer(x1: number, z1: number, x2: number, z2: number, color: number): void {
     const geo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(x1, 1.6, z1), new THREE.Vector3(x2, 0.8, z2),
@@ -109,6 +156,31 @@ export class Effects {
   }
 
   update(dt: number): void {
+    this.bloodBudget = Math.min(6, this.bloodBudget + dt * 20);
+    for (let i = this.rings.length - 1; i >= 0; i--) {
+      const r = this.rings[i]!;
+      r.life -= dt;
+      if (r.life <= 0) {
+        this.scene.remove(r.mesh);
+        (r.mesh.material as THREE.Material).dispose();
+        this.rings.splice(i, 1);
+        continue;
+      }
+      const k = 1 - r.life / r.maxLife;
+      r.mesh.scale.setScalar(0.1 + k * r.maxScale);
+      (r.mesh.material as THREE.MeshBasicMaterial).opacity = 0.7 * (1 - k);
+    }
+    for (let i = this.flashes.length - 1; i >= 0; i--) {
+      const f = this.flashes[i]!;
+      f.life -= dt;
+      if (f.life <= 0) {
+        this.scene.remove(f.mesh);
+        (f.mesh.material as THREE.Material).dispose();
+        this.flashes.splice(i, 1);
+      } else {
+        f.mesh.scale.setScalar(1 + (0.09 - f.life) * 8);
+      }
+    }
     for (let i = this.active.length - 1; i >= 0; i--) {
       const p = this.active[i]!;
       p.life -= dt;

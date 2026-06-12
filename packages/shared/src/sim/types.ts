@@ -86,7 +86,7 @@ export type Command =
   | { kind: 'demolish'; buildingId: EntityId };
 
 export type SimEvent =
-  | { kind: 'projectile'; from: Vec2; to: Vec2; weapon: 'arrow' | 'bolt' | 'bomb' | 'ice' | 'lightning' }
+  | { kind: 'projectile'; from: Vec2; to: Vec2; weapon: 'arrow' | 'bolt' | 'bomb' | 'ice' | 'lightning' | 'spit' }
   | { kind: 'damage'; pos: Vec2; amount: number; crit: boolean }
   | { kind: 'explosion'; pos: Vec2; radius: number }
   | { kind: 'chain'; points: Vec2[] }

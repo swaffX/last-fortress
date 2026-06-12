@@ -150,10 +150,13 @@ export class Hud {
     this.q('#boss-bar').classList.toggle('hidden', !boss);
     if (boss) this.q('#boss-fill').style.width = `${(boss.hp / boss.maxHp) * 100}%`;
 
-    // build slot lock state by castle level
+    // build slot state: locked by castle level, dimmed when unaffordable
     for (const el of this.root.querySelectorAll('.build-slot')) {
       const type = (el as HTMLElement).dataset.type as BuildingType;
       el.classList.toggle('locked', BUILDINGS[type].unlockCastleLevel > castleLevel);
+      const c = BUILDINGS[type].tiers[0]!.cost;
+      const afford = (c.wood ?? 0) <= res.wood && (c.stone ?? 0) <= res.stone && (c.gold ?? 0) <= res.gold;
+      el.classList.toggle('poor', !afford);
     }
 
     // party panel

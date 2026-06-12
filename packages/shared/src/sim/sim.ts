@@ -399,6 +399,9 @@ export class Sim {
       if (nearPlayer) {
         if (e.attackCooldown === 0) {
           e.attackCooldown = def.attackCooldownTicks;
+          if (def.attackRange > 2) {
+            events.push({ kind: 'projectile', from: { ...e.pos }, to: { ...nearPlayer.pos }, weapon: 'spit' });
+          }
           this.damagePlayer(nearPlayer.id, dmg);
         }
         continue;
@@ -409,6 +412,11 @@ export class Sim {
       if (targetB) {
         if (e.attackCooldown === 0) {
           e.attackCooldown = def.attackCooldownTicks;
+          if (def.attackRange > 2) {
+            const size = BUILDINGS[targetB.type].size;
+            events.push({ kind: 'projectile', from: { ...e.pos },
+              to: buildingCenter(targetB.pos, size), weapon: 'spit' });
+          }
           this.damageBuilding(targetB.id, dmg, events);
         }
         continue;  // hold position while attacking

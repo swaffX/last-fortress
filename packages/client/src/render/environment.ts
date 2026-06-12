@@ -22,6 +22,7 @@ export class Environment {
   private root = new THREE.Group();
   private fogPlanes: THREE.Mesh[] = [];
   private flames: THREE.Mesh[] = [];
+  private smoke: THREE.Mesh[] = [];
   private time = 0;
   private occupied: { x: number; y: number; r: number }[] = [];
 
@@ -30,6 +31,8 @@ export class Environment {
     for (const n of nodes) this.occupied.push({ x: n.pos.x, y: n.pos.y, r: 1.5 });
 
     this.groundPatches(rng);
+    this.paths(rng);
+    this.campfire();
     this.houses(rng);
     this.ruinedVillage(rng);
     this.cemetery(rng);
@@ -71,6 +74,73 @@ export class Environment {
     this.root.add(g);
   }
 
+  // ---- worn dirt paths radiating from the castle gate in 4 directions ----
+  private paths(rng: Rng): void {
+    for (let d = 0; d < 4; d++) {
+      const a = (d / 4) * Math.PI * 2 + Math.PI / 4 + (rng.next() - 0.5) * 0.3;
+      let px = CX + Math.cos(a) * 7, py = CY + Math.sin(a) * 7;
+      let dir = a;
+      for (let seg = 0; seg < 14; seg++) {
+        const len = 3.5 + rng.next() * 2;
+        const strip = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.3 + rng.next() * 0.5, len),
+          new THREE.MeshLambertMaterial({ color: 0x8a7350, transparent: true, opacity: 0.45, depthWrite: false }));
+        strip.rotation.x = -Math.PI / 2;
+        strip.rotation.z = -dir + Math.PI / 2;
+        strip.position.set(px + Math.cos(dir) * len / 2, 0.025, py + Math.sin(dir) * len / 2);
+        this.root.add(strip);
+        px += Math.cos(dir) * len;
+        py += Math.sin(dir) * len;
+        dir += (rng.next() - 0.5) * 0.5;   // winding
+        if (px < 8 || py < 8 || px > MAP_SIZE - 8 || py > MAP_SIZE - 8) break;
+      }
+    }
+  }
+
+  // ---- campfire by the castle gate: log seats, animated flame, smoke ----
+  private campfire(): void {
+    const g = new THREE.Group();
+    const fx = CX + 4.5, fy = CY + 6.5;
+    // stone circle
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2;
+      const s = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12), mat(STONE_DARK));
+      s.position.set(Math.cos(a) * 0.5, 0.08, Math.sin(a) * 0.5);
+      g.add(s);
+    }
+    // crossed logs
+    for (const r of [0.5, 2.1]) {
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.8, 5), mat(0x5e4023));
+      log.rotation.z = Math.PI / 2 - 0.3;
+      log.rotation.y = r;
+      log.position.y = 0.12;
+      g.add(log);
+    }
+    // seat logs
+    for (const [lx, lz] of [[-1.2, 0.4], [1, -0.9]] as const) {
+      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 1.4, 6), mat(0x6b4a2a));
+      seat.rotation.z = Math.PI / 2;
+      seat.rotation.y = lx;
+      seat.position.set(lx, 0.16, lz);
+      g.add(seat);
+    }
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.5, 5), mat(0xffaa33, 0xff8c3b));
+    flame.position.y = 0.35;
+    g.add(flame);
+    this.flames.push(flame);
+    // smoke puffs — recycled small spheres rising
+    for (let i = 0; i < 4; i++) {
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(0.12, 5, 4),
+        new THREE.MeshBasicMaterial({ color: 0x55606a, transparent: true, opacity: 0.3, depthWrite: false }));
+      puff.userData.phase = i / 4;
+      puff.position.y = 0.6;
+      g.add(puff);
+      this.smoke.push(puff);
+    }
+    g.position.set(fx, 0, fy);
+    this.root.add(g);
+  }
+
   // ---- abandoned houses: tilted walls, collapsed roof half ----
   private houses(rng: Rng): void {
     for (let i = 0; i < 6; i++) {
@@ -98,6 +168,25 @@ export class Environment {
         g.add(rb);
       }
       g.add(back, sideL, sideR, roof);
+      // barrels, crates and a fence stretch beside each house
+      for (let b = 0; b < rng.int(1, 3); b++) {
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.45, 8), mat(0x7a5a32));
+        barrel.position.set(w / 2 + 0.5 + b * 0.45, 0.22, (rng.next() - 0.5) * d);
+        g.add(barrel);
+      }
+      if (rng.next() < 0.7) {
+        const crate = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), mat(0x8a6238));
+        crate.position.set(-w / 2 - 0.5, 0.22, d * 0.3);
+        crate.rotation.y = rng.next();
+        g.add(crate);
+      }
+      for (let f = 0; f < 4; f++) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.55, 0.08), mat(WOOD_DARK));
+        post.position.set(-w / 2 + f * 0.6, 0.27, d / 2 + 0.8);
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.06, 0.05), mat(WOOD_DARK));
+        rail.position.set(-w / 2 + f * 0.6 + 0.3, 0.4, d / 2 + 0.8);
+        g.add(post, rail);
+      }
       this.place(g, p.x, p.y, rng.next() * Math.PI * 2);
     }
   }
@@ -391,6 +480,14 @@ export class Environment {
       const k = Math.sin(this.time * 11 + i * 2.3) * 0.5 + Math.sin(this.time * 7.3 + i) * 0.5;
       fl.scale.set(1 + k * 0.15, 1 + k * 0.3, 1 + k * 0.15);
       (fl.material as THREE.MeshLambertMaterial).emissiveIntensity = 0.7 + k * 0.25;
+    }
+    for (const puff of this.smoke) {
+      const ph = ((this.time * 0.25 + (puff.userData.phase as number)) % 1);
+      puff.position.y = 0.6 + ph * 2.2;
+      puff.position.x = Math.sin(this.time * 0.7 + ph * 6) * 0.2;
+      const m = puff.material as THREE.MeshBasicMaterial;
+      m.opacity = 0.32 * (1 - ph);
+      puff.scale.setScalar(0.7 + ph * 1.6);
     }
   }
 }
