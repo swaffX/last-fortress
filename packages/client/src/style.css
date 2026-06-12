@@ -136,8 +136,17 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 /* ============ HUD ============ */
+/* HUD is click-transparent by default. The old `#hud > * { auto }` rule made
+   the full-screen damage-number layer (a later sibling) swallow every click
+   aimed at the inventory bar. Only explicitly interactive widgets opt in. */
 #hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; font-size: 14px; }
-#hud > * { pointer-events: auto; }
+#hud > * { pointer-events: none; }
+#hud .build-bar, #hud .build-bar *,
+#hud .build-menu, #hud .build-menu *,
+#hud .choice-overlay, #hud .choice-overlay *,
+#hud .sel-panel .btn,
+#hud .chat-input,
+#hud .overlay, #hud .overlay * { pointer-events: auto; }
 
 .hud-top {
   position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
