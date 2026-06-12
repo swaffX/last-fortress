@@ -1,0 +1,5 @@
+# Replace example.com with your domain (DNS A record → this VPS).
+# Caddy provisions Let's Encrypt TLS automatically.
+example.com {
+	reverse_proxy game:8080
+}

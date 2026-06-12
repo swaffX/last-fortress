@@ -1,0 +1,45 @@
+services:
+  game:
+    build: .
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://lastfortress:${DB_PASSWORD:?set DB_PASSWORD in .env}@db:5432/lastfortress
+      TOKEN_SECRET: ${TOKEN_SECRET:?set TOKEN_SECRET in .env}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lastfortress
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      POSTGRES_DB: lastfortress
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lastfortress"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # TLS reverse proxy — set your domain in Caddyfile, then expose 80/443.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - game
+
+volumes:
+  pgdata:
+  caddy_data:
