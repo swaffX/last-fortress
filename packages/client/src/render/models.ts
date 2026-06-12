@@ -17,6 +17,72 @@ import type { BuildingType, EnemyType, ClassType } from '@lf/shared';
 const mat = (color: number, emissive = 0) =>
   new THREE.MeshLambertMaterial({ color, emissive, emissiveIntensity: emissive ? 0.7 : 0 });
 
+/** lazily built shared surface textures — stone block courses, wood grain */
+let stoneTexCache: THREE.CanvasTexture | null = null;
+let woodTexCache: THREE.CanvasTexture | null = null;
+
+function stoneTex(): THREE.CanvasTexture {
+  if (stoneTexCache) return stoneTexCache;
+  const S = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#9da2a8';
+  ctx.fillRect(0, 0, S, S);
+  // staggered block courses with mortar lines and per-block shading
+  const rowH = 16;
+  for (let row = 0; row < S / rowH; row++) {
+    const off = (row % 2) * 16;
+    for (let x = -1; x < S / 32 + 1; x++) {
+      const shade = 150 + Math.floor(Math.random() * 40);
+      ctx.fillStyle = `rgb(${shade},${shade + 3},${shade + 8})`;
+      ctx.fillRect(x * 32 + off + 1, row * rowH + 1, 30, rowH - 2);
+    }
+  }
+  ctx.strokeStyle = 'rgba(60,64,70,0.5)';
+  for (let i = 0; i < 60; i++) {  // chips and cracks
+    ctx.beginPath();
+    const x = Math.random() * S, y = Math.random() * S;
+    ctx.moveTo(x, y); ctx.lineTo(x + Math.random() * 6 - 3, y + Math.random() * 6);
+    ctx.stroke();
+  }
+  stoneTexCache = new THREE.CanvasTexture(c);
+  stoneTexCache.wrapS = stoneTexCache.wrapT = THREE.RepeatWrapping;
+  return stoneTexCache;
+}
+
+function woodTex(): THREE.CanvasTexture {
+  if (woodTexCache) return woodTexCache;
+  const S = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#9c8054';
+  ctx.fillRect(0, 0, S, S);
+  // vertical planks with grain streaks
+  for (let p = 0; p < 6; p++) {
+    const shade = 130 + Math.floor(Math.random() * 35);
+    ctx.fillStyle = `rgb(${shade},${Math.floor(shade * 0.78)},${Math.floor(shade * 0.5)})`;
+    ctx.fillRect(p * 22 + 1, 0, 20, S);
+    ctx.strokeStyle = 'rgba(70,50,28,0.45)';
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      const x = p * 22 + 3 + Math.random() * 16;
+      ctx.moveTo(x, 0);
+      ctx.bezierCurveTo(x + 3, S * 0.3, x - 3, S * 0.6, x + 2, S);
+      ctx.stroke();
+    }
+  }
+  ctx.strokeStyle = 'rgba(60,42,24,0.7)';
+  for (let p = 0; p <= 6; p++) { ctx.beginPath(); ctx.moveTo(p * 22, 0); ctx.lineTo(p * 22, S); ctx.stroke(); }
+  woodTexCache = new THREE.CanvasTexture(c);
+  woodTexCache.wrapS = woodTexCache.wrapT = THREE.RepeatWrapping;
+  return woodTexCache;
+}
+
+const stoneMat = (tint = 0xffffff) => new THREE.MeshLambertMaterial({ map: stoneTex(), color: tint });
+const woodMat = (tint = 0xffffff) => new THREE.MeshLambertMaterial({ map: woodTex(), color: tint });
+
 const WOOD = 0x8a6238, WOOD_DARK = 0x5e4023, STONE = 0x8d9299, STONE_DARK = 0x5c6168;
 const STEEL = 0xb8c4cf, IRON = 0x6a7078, ROOF = 0xb8512e, GOLD = 0xd9a93f, ICE = 0x7cc7e8;
 const ZAP = 0xffe16b, LEAF = 0x3f7a33, TRUNK = 0x6b4a2a, ROCK = 0x7d8087;
@@ -77,7 +143,9 @@ export function buildingModel(type: BuildingType, tier: number): THREE.Group {
   switch (type) {
     case 'wood_wall': {
       const h = 1 + t * 0.3;
-      const g = group(box(0.9, h, 0.9, t >= 2 ? WOOD_DARK : WOOD));
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(0.9, h, 0.9), woodMat(t >= 2 ? 0x9a8060 : 0xd0b890));
+      wall.position.y = h / 2;
+      const g = group(wall);
       // horizontal plank lines from tier 2, iron band at tier 3
       if (t >= 1) {
         g.add(at(box(0.96, 0.08, 0.96, WOOD_DARK), 0, h * 0.35, 0));
@@ -88,7 +156,9 @@ export function buildingModel(type: BuildingType, tier: number): THREE.Group {
     }
     case 'stone_wall': {
       const h = 1.2 + t * 0.35;
-      const g = group(box(0.92, h, 0.92, t >= 2 ? STONE_DARK : STONE));
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(0.92, h, 0.92), stoneMat(t >= 2 ? 0x9aa0aa : 0xd8dde4));
+      wall.position.y = h / 2;
+      const g = group(wall);
       if (t >= 1) g.add(crenels(0.92, h + 0.09, STONE_DARK, 0.92));
       if (t >= 2) g.add(at(box(0.98, 0.12, 0.98, IRON), 0, h * 0.5, 0));
       return g;
@@ -126,8 +196,11 @@ export function buildingModel(type: BuildingType, tier: number): THREE.Group {
         at(new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 5), mat(0xd8b59a)), 0, 0.5, 0),
         at(box(0.04, 0.5, 0.04, TRUNK), 0, 0.3, 0.18),
       );
+      const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, h, 8),
+        woodMat(t >= 2 ? 0x9a8060 : 0xd0b890));
+      tower.position.y = h / 2;
       const g = group(
-        cyl(0.55, 0.7, h, t >= 2 ? WOOD_DARK : WOOD),
+        tower,
         at(box(1.3, 0.18, 1.3, WOOD_DARK), 0, h, 0),
         crenels(1.3, h + 0.17, WOOD_DARK, 1.3),
         turret,
@@ -267,8 +340,10 @@ export function buildingModel(type: BuildingType, tier: number): THREE.Group {
     case 'castle': {
       const lvl = tier; // 1..5
       const h = 2.2 + lvl * 0.5;
+      const keep = new THREE.Mesh(new THREE.BoxGeometry(3.4, h, 3.4), stoneMat(0xd2d8e0));
+      keep.position.y = h / 2;
       const g = group(
-        box(3.4, h, 3.4, STONE),
+        keep,
         at(box(3.7, 0.3, 3.7, STONE_DARK), 0, h, 0),
         crenels(3.7, h + 0.3, STONE_DARK, 3.7),
         at(box(0.9, 1.3, 0.16, WOOD_DARK), 0, 0.65, 1.72),          // gate door
@@ -276,7 +351,7 @@ export function buildingModel(type: BuildingType, tier: number): THREE.Group {
       );
       const flags: THREE.Mesh[] = [];
       for (const [dx, dz] of [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]]) {
-        const tw = cyl(0.45, 0.55, h + 0.8, STONE);
+        const tw = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, h + 0.8, 8), stoneMat(0xc8cfd8));
         tw.position.set(dx!, (h + 0.8) / 2, dz!);
         const cap = cone(0.55, 0.7, ROOF, h + 1.15, 6);
         cap.position.set(dx!, h + 1.15, dz!);
@@ -524,33 +599,65 @@ export function treeModel(variant = 0, jitter = 0): THREE.Group {
   let sway: THREE.Object3D[];
   let g: THREE.Group;
   if (variant === 1) {
-    // oak: thick trunk, 3 overlapping leaf blobs
-    const b1 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 0), mat(leafColor));
-    b1.position.set(0, 1.35, 0);
-    const b2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.45, 0), mat(leafColor2));
-    b2.position.set(0.4, 1.15, 0.15);
-    const b3 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 0), mat(leafColor));
-    b3.position.set(-0.35, 1.2, -0.1);
-    g = group(cyl(0.16, 0.24, 1, TRUNK), b1, b2, b3);
-    sway = [b1, b2, b3];
+    // oak: bent thick trunk, root flare, cloud of squashed leaf blobs
+    const trunk = cyl(0.14, 0.22, 1.1, TRUNK);
+    trunk.rotation.z = (jitter - 0.5) * 0.18;
+    const blobs: THREE.Mesh[] = [];
+    const blobDefs: [number, number, number, number, number][] = [
+      [0.62, 0, 1.5, 0, 0],         [0.46, 0.42, 1.28, 0.18, 1],
+      [0.42, -0.38, 1.32, -0.12, 0], [0.36, 0.1, 1.78, -0.2, 1],
+      [0.3, -0.15, 1.05, 0.3, 0],
+    ];
+    for (const [r, x, y, z, alt] of blobDefs) {
+      const b = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), mat(alt ? leafColor2 : leafColor));
+      b.position.set(x, y, z);
+      b.scale.y = 0.8;
+      b.rotation.set(jitter * 2, jitter * 4, jitter);
+      blobs.push(b);
+    }
+    g = group(trunk, ...blobs);
+    sway = blobs;
   } else if (variant === 2) {
-    // tall fir: three stacked slim cones
-    const c1 = cone(0.5, 0.9, leafColor, 1.1, 7);
-    const c2 = cone(0.38, 0.8, leafColor2, 1.7, 7);
-    const c3 = cone(0.25, 0.7, leafColor, 2.25, 7);
-    g = group(cyl(0.1, 0.16, 0.8, TRUNK), c1, c2, c3);
-    sway = [c1, c2, c3];
+    // tall fir: four stacked slim cones, drooping tips
+    const c1 = cone(0.55, 0.85, leafColor, 1.0, 7);
+    const c2 = cone(0.44, 0.8, leafColor2, 1.55, 7);
+    const c3 = cone(0.32, 0.7, leafColor, 2.05, 7);
+    const c4 = cone(0.2, 0.55, leafColor2, 2.5, 7);
+    g = group(cyl(0.09, 0.17, 0.9, TRUNK), c1, c2, c3, c4);
+    sway = [c1, c2, c3, c4];
   } else {
-    const crown1 = cone(0.55, 1.1, leafColor, 1.2, 6);
-    const crown2 = cone(0.4, 0.8, leafColor2, 1.7, 6);
-    g = group(cyl(0.12, 0.18, 0.7, TRUNK), crown1, crown2);
+    // pine: classic double cone, slight asymmetry
+    const crown1 = cone(0.58, 1.15, leafColor, 1.2, 7);
+    crown1.rotation.y = jitter * 3;
+    const crown2 = cone(0.42, 0.85, leafColor2, 1.75, 7);
+    crown2.position.x = (jitter - 0.5) * 0.12;
+    g = group(cyl(0.12, 0.2, 0.75, TRUNK), crown1, crown2);
     sway = [crown1, crown2];
+  }
+  // root flare: three small wedges at the base
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + jitter * 2;
+    const root = cone(0.09, 0.22, TRUNK, 0.1, 4);
+    root.position.set(Math.cos(a) * 0.16, 0.08, Math.sin(a) * 0.16);
+    root.rotation.z = Math.cos(a) * 0.5;
+    root.rotation.x = -Math.sin(a) * 0.5;
+    g.add(root);
   }
   g.userData.sway = sway;
   return g;
 }
 export function rockModel(): THREE.Group {
-  const g = group(new THREE.Mesh(new THREE.DodecahedronGeometry(0.45), mat(ROCK)));
-  g.children[0]!.position.y = 0.35;
-  return g;
+  // boulder cluster: one big + two satellites + mossy cap
+  const main = new THREE.Mesh(new THREE.DodecahedronGeometry(0.45), mat(ROCK));
+  main.position.y = 0.32;
+  main.rotation.set(0.3, 0.8, 0.1);
+  const s1 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24), mat(0x6e7178));
+  s1.position.set(0.42, 0.16, 0.18);
+  s1.rotation.y = 1.4;
+  const s2 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18), mat(0x8a8d94));
+  s2.position.set(-0.35, 0.12, -0.22);
+  const moss = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), mat(0x4a6b35));
+  moss.position.set(-0.05, 0.62, -0.05);
+  moss.scale.set(1, 0.35, 1);
+  return group(main, s1, s2, moss);
 }

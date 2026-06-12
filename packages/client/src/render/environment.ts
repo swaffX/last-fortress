@@ -59,6 +59,10 @@ export class Environment {
   private smoke: THREE.Mesh[] = [];
   private lights: { light: THREE.PointLight; base: number; phase: number }[] = [];
   private waterTex: THREE.CanvasTexture | null = null;
+  private waterTex2: THREE.CanvasTexture | null = null;
+  private foam: THREE.Mesh[] = [];
+  private fireflies: THREE.Mesh[] = [];
+  private millBlades: THREE.Group | null = null;
   private time = 0;
   private occupied: { x: number; y: number; r: number }[] = [];
 
@@ -78,6 +82,8 @@ export class Environment {
     this.fog(rng);
     this.grassAndFlowers(rng);
     this.bushesAndProps(rng);
+    this.windmill(rng);
+    this.firefliesInit(rng);
     this.torchPosts();
 
     this.root.traverse(o => {
@@ -113,12 +119,19 @@ export class Environment {
 
   // ---- winding river with banks and two wooden bridges (visual only) ----
   private river(rng: Rng): void {
-    // animated water texture shared by all segments
+    // two water layers scrolling at different speeds — parallax flow
     this.waterTex = makeWaterTexture();
     this.waterTex.wrapS = this.waterTex.wrapT = THREE.RepeatWrapping;
+    this.waterTex2 = makeWaterTexture();
+    this.waterTex2.wrapS = this.waterTex2.wrapT = THREE.RepeatWrapping;
+    this.waterTex2.repeat.set(1.7, 1.7);
     const waterMat = new THREE.MeshLambertMaterial({
       map: this.waterTex, transparent: true, opacity: 0.92,
       emissive: 0x1a3a52, emissiveIntensity: 0.25,
+    });
+    const waterMat2 = new THREE.MeshLambertMaterial({
+      map: this.waterTex2, transparent: true, opacity: 0.3,
+      emissive: 0x4a7a9a, emissiveIntensity: 0.15, depthWrite: false,
     });
     const bankMat = new THREE.MeshLambertMaterial({ color: 0x8a7350, transparent: true, opacity: 0.7, depthWrite: false });
 
@@ -139,12 +152,41 @@ export class Environment {
       bank.rotation.x = -Math.PI / 2;
       bank.rotation.z = -dir;
       bank.position.set(cx, 0.028, cy);
-      // water surface
+      // water surface + faster shimmer layer on top
       const water = new THREE.Mesh(new THREE.PlaneGeometry(len, W), waterMat);
       water.rotation.x = -Math.PI / 2;
       water.rotation.z = -dir;
       water.position.set(cx, 0.045, cy);
-      this.root.add(bank, water);
+      const shimmer = new THREE.Mesh(new THREE.PlaneGeometry(len, W * 0.85), waterMat2);
+      shimmer.rotation.x = -Math.PI / 2;
+      shimmer.rotation.z = -dir;
+      shimmer.position.set(cx, 0.055, cy);
+      this.root.add(bank, water, shimmer);
+      // foam lines hugging both banks, opacity pulses in update()
+      for (const s of [-1, 1]) {
+        const foam = new THREE.Mesh(
+          new THREE.PlaneGeometry(len, 0.22),
+          new THREE.MeshBasicMaterial({ color: 0xd8ecf5, transparent: true, opacity: 0.3, depthWrite: false }));
+        foam.rotation.x = -Math.PI / 2;
+        foam.rotation.z = -dir;
+        foam.position.set(cx - Math.sin(dir) * s * (W / 2 - 0.1), 0.06, cy + Math.cos(dir) * s * (W / 2 - 0.1));
+        foam.userData.phase = cx * 0.7 + s;
+        this.root.add(foam);
+        this.foam.push(foam);
+      }
+      // lily pads drifting on calm stretches
+      if (rng.next() < 0.3) {
+        const pad = new THREE.Mesh(new THREE.CircleGeometry(0.22 + rng.next() * 0.12, 7),
+          mat(0x3f7a45));
+        pad.rotation.x = -Math.PI / 2;
+        pad.position.set(cx + (rng.next() - 0.5) * 1.5, 0.06, cy + (rng.next() - 0.5) * (W * 0.5));
+        this.root.add(pad);
+        if (rng.next() < 0.4) {
+          const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.07, 5, 4), mat(0xe8a0c8, 0xe8a0c8));
+          bloom.position.copy(pad.position).y = 0.12;
+          this.root.add(bloom);
+        }
+      }
       // reeds and stones along the banks
       if (rng.next() < 0.5) {
         const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.5 + rng.next() * 0.3, 4), mat(0x55683a));
@@ -590,6 +632,62 @@ export class Environment {
     }
   }
 
+  // ---- ruined windmill landmark with slowly turning sails ----
+  private windmill(rng: Rng): void {
+    const p = this.spot(rng, 30, 50, 6);
+    if (!p) return;
+    const g = new THREE.Group();
+    const towerBody = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.5, 4.2, 8), mat(0x8d9299));
+    towerBody.position.y = 2.1;
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(1.25, 1.1, 8), mat(0x5e4023));
+    cap.position.y = 4.7;
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1, 0.12), mat(0x4a3b28));
+    door.position.set(0, 0.55, 1.42);
+    g.add(towerBody, cap, door);
+    // sails on a hub, one blade broken short
+    const blades = new THREE.Group();
+    blades.position.set(0, 4.3, 1.35);
+    for (let i = 0; i < 4; i++) {
+      const len = i === 3 ? 1.1 : 2.4;     // broken sail
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, len, 0.08), mat(0x6b4a2a));
+      arm.position.y = len / 2;
+      const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.55, len * 0.75),
+        new THREE.MeshLambertMaterial({ color: 0xc8bfa8, side: THREE.DoubleSide }));
+      cloth.position.set(0.32, len * 0.55, 0);
+      const wing = new THREE.Group();
+      wing.add(arm, cloth);
+      wing.rotation.z = (i / 4) * Math.PI * 2;
+      blades.add(wing);
+    }
+    const hub = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 5), mat(0x4a3b28));
+    blades.add(hub);
+    g.add(blades);
+    this.millBlades = blades;
+    g.rotation.y = rng.next() * Math.PI * 2;
+    g.position.set(p.x, 0, p.y);
+    this.root.add(g);
+  }
+
+  // ---- fireflies: drifting emissive motes near swamps and woods, bloom at night ----
+  private firefliesInit(rng: Rng): void {
+    for (let i = 0; i < 36; i++) {
+      const a = rng.next() * Math.PI * 2;
+      const r = 20 + rng.next() * 36;
+      const fly = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05, 4, 3),
+        new THREE.MeshLambertMaterial({
+          color: 0xd8ffa0, emissive: 0xb8e85a, emissiveIntensity: 1.4,
+          transparent: true, opacity: 0.9,
+        }));
+      fly.position.set(CX + Math.cos(a) * r, 0.8, CY + Math.sin(a) * r);
+      fly.userData.base = fly.position.clone();
+      fly.userData.phase = rng.next() * Math.PI * 2;
+      fly.userData.speed = 0.4 + rng.next() * 0.6;
+      this.root.add(fly);
+      this.fireflies.push(fly);
+    }
+  }
+
   // ---- torch posts ringing the castle clearing, flame flicker ----
   private torchPosts(): void {
     for (let i = 0; i < 4; i++) {
@@ -614,8 +712,30 @@ export class Environment {
 
   update(dt: number): void {
     this.time += dt;
-    // flowing water
+    // flowing water: two layers at different speeds = parallax depth
     if (this.waterTex) this.waterTex.offset.x = (this.time * 0.06) % 1;
+    if (this.waterTex2) {
+      this.waterTex2.offset.x = (this.time * 0.11) % 1;
+      this.waterTex2.offset.y = (this.time * 0.02) % 1;
+    }
+    // bank foam breathes
+    for (const f of this.foam) {
+      (f.material as THREE.MeshBasicMaterial).opacity =
+        0.2 + Math.sin(this.time * 1.8 + (f.userData.phase as number)) * 0.12;
+    }
+    // windmill sails turn lazily
+    if (this.millBlades) this.millBlades.rotation.z += dt * 0.35;
+    // fireflies wander in slow loops, blinking
+    for (const fly of this.fireflies) {
+      const base = fly.userData.base as THREE.Vector3;
+      const ph = fly.userData.phase as number;
+      const sp = fly.userData.speed as number;
+      fly.position.x = base.x + Math.sin(this.time * sp + ph) * 2.2;
+      fly.position.z = base.z + Math.cos(this.time * sp * 0.8 + ph * 2) * 2.2;
+      fly.position.y = 0.7 + Math.sin(this.time * sp * 1.7 + ph) * 0.4;
+      const blink = Math.sin(this.time * 2.2 + ph * 3);
+      (fly.material as THREE.MeshLambertMaterial).emissiveIntensity = blink > 0 ? 1.4 : 0.15;
+    }
     // firelight flicker
     for (const { light, base, phase } of this.lights) {
       light.intensity = base * (0.85 + Math.sin(this.time * 9 + phase) * 0.1

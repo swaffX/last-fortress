@@ -13,6 +13,17 @@ interface Tracked {
   attackT: number;         // >0 while playing an attack lunge
   deadT: number;           // >0 while playing death fall (enemies removed server-side, players stay)
   recoilT: number;         // tower recoil
+  heading: number;         // current smoothed facing
+  targetHeading: number;   // where the entity wants to face
+  turnRate: number;        // smoothed angular velocity — drives banking lean
+}
+
+/** shortest-path angular damp: eases rotation instead of snapping */
+function dampAngle(current: number, target: number, lambda: number, dt: number): number {
+  let diff = target - current;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  return current + diff * Math.min(1, lambda * dt);
 }
 
 /** Syncs server entity views into the Three scene; runs procedural animations. */
@@ -135,6 +146,7 @@ export class World {
       obj, kind,
       from: new THREE.Vector3(x, 0, y), to: new THREE.Vector3(x, 0, y),
       hpBar, animT: (id % 31) * 0.21, attackT: 0, deadT: 0, recoilT: 0,
+      heading: 0, targetHeading: 0, turnRate: 0,
     };
     this.tracked.set(id, t);
     return t;
@@ -198,7 +210,8 @@ export class World {
         const pull = err > 2 ? 1 : Math.min(1, dt * (moving ? 2.5 : 8));
         this.selfPredicted.lerp(t.to, pull);
         t.obj.position.copy(this.selfPredicted);
-        if (moving) t.obj.rotation.y = Math.atan2(this.selfDir.x, this.selfDir.y);
+        if (moving) t.targetHeading = Math.atan2(this.selfDir.x, this.selfDir.y);
+        this.applyHeading(t, dt, 12);
         this.animateCharacter(t, moving, dt);
         continue;
       }
@@ -207,7 +220,8 @@ export class World {
       if (!isBuilding) {
         const dx = t.to.x - t.from.x, dz = t.to.z - t.from.z;
         const moving = Math.abs(dx) + Math.abs(dz) > 0.004;
-        if (moving) t.obj.rotation.y = Math.atan2(dx, dz);
+        if (moving) t.targetHeading = Math.atan2(dx, dz);
+        this.applyHeading(t, dt, t.kind.startsWith('player') ? 12 : 7);
         this.animateCharacter(t, moving, dt);
       } else {
         this.animateBuilding(t, dt);
@@ -224,6 +238,19 @@ export class World {
         s.rotation.z = Math.cos(this.time * 0.6 + phase) * 0.04;
       }
     }
+  }
+
+  /** Eased turning + banking: characters lean into turns instead of snapping. */
+  private applyHeading(t: Tracked, dt: number, lambda: number): void {
+    const before = t.heading;
+    t.heading = dampAngle(t.heading, t.targetHeading, lambda, dt);
+    let dh = t.heading - before;
+    while (dh > Math.PI) dh -= Math.PI * 2;
+    while (dh < -Math.PI) dh += Math.PI * 2;
+    const instRate = dt > 0 ? dh / dt : 0;
+    t.turnRate += (instRate - t.turnRate) * Math.min(1, dt * 10);
+    t.obj.rotation.y = t.heading;
+    t.obj.rotation.z = THREE.MathUtils.clamp(-t.turnRate * 0.045, -0.16, 0.16);
   }
 
   private animateCharacter(t: Tracked, moving: boolean, dt: number): void {
@@ -246,6 +273,7 @@ export class World {
     const isZombie = t.kind.startsWith('enemy');
     const rate = moving ? (isZombie ? 7 : 10) : 1.6;
     const swing = Math.sin(t.animT * rate);
+    const head = u.head as THREE.Mesh | undefined;
 
     if (moving) {
       legs[0]!.rotation.x = swing * 0.7;
@@ -254,24 +282,38 @@ export class World {
       arms[0]!.rotation.x = armBase - swing * (isZombie ? 0.15 : 0.45);
       arms[1]!.rotation.x = armBase + swing * (isZombie ? 0.15 : 0.45);
       body.position.y = 0.75 + Math.abs(Math.sin(t.animT * rate)) * 0.05;
+      // lean into the run, hips roll with the stride, head bobs slightly
+      body.rotation.x = isZombie ? 0 : 0.09;
+      body.rotation.z = swing * 0.04;
+      if (head) {
+        head.position.y = 1.36 + Math.abs(swing) * 0.03;
+        head.rotation.y = 0;
+      }
     } else {
+      // idle: weight shift, slow breathing, lazy look-around
       legs[0]!.rotation.x = legs[1]!.rotation.x = 0;
-      // idle breath
-      body.position.y = 0.75 + Math.sin(t.animT * 1.6) * 0.015;
+      body.position.y = 0.75 + Math.sin(t.animT * 1.6) * 0.018;
+      body.rotation.x = 0;
+      body.rotation.z = Math.sin(t.animT * 0.8) * 0.025;
+      const armBase = isZombie ? -0.9 : 0;
+      arms[0]!.rotation.x = armBase + Math.sin(t.animT * 1.6) * 0.05;
+      arms[1]!.rotation.x = armBase - Math.sin(t.animT * 1.6 + 0.6) * 0.05;
+      if (head && !isZombie) {
+        head.rotation.y = Math.sin(t.animT * 0.45) * 0.4;       // scan surroundings
+        head.position.y = 1.36;
+      }
       // zombies standing still are attacking something — periodic lunge
       if (isZombie && t.attackT <= 0 && Math.random() < dt * 1.2) t.attackT = 1;
     }
 
-    // attack lunge: arms slam down, slight body pitch
+    // attack lunge: arms slam down, body pitches into the strike
     if (t.attackT > 0) {
       t.attackT = Math.max(0, t.attackT - dt * 3.5);
       const k = Math.sin((1 - t.attackT) * Math.PI);
       const armBase = isZombie ? -0.9 : 0;
       arms[1]!.rotation.x = armBase - k * 1.6;
       if (!isZombie) arms[0]!.rotation.x = 0;
-      body.rotation.x = k * 0.12;
-    } else {
-      body.rotation.x = 0;
+      body.rotation.x += k * 0.12;
     }
 
     // cape / cloth flutter
