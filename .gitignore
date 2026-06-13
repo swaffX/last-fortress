@@ -14,4 +14,8 @@ dist/
 Obsidian-LastFortress/.obsidian/
 
 # drop-in 3D assets (licensed separately, added locally / at deploy)
-packages/client/public/models/*.glb
+packages/client/public/models/**
+!packages/client/public/models/
+!packages/client/public/models/README.md
+# stray extracted asset packs (delete locally when unlocked)
+packages/client/public/Ultimate Stylized Nature*/
