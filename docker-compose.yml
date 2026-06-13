@@ -9,8 +9,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Caddy (system service on :80/:443) fronts this and reverse-proxies
+    # 212.180.120.69 -> localhost:8080. Bind to loopback only: not publicly
+    # exposed, and never contends with Caddy for :80.
     ports:
-      - "80:8080"
+      - "127.0.0.1:8080:8080"
 
   db:
     image: postgres:17-alpine
