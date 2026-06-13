@@ -7,14 +7,29 @@ export type {
 
 type Handler = (msg: ServerMsg) => void;
 
+/**
+ * Resolve the game server WebSocket URL. Priority:
+ *   1. window.__LF_SERVER__  — injected by the Electron preload (desktop → VDS)
+ *   2. VITE_SERVER_URL       — baked at build time
+ *   3. same-origin           — browser default (served by the VDS Node server)
+ * A value that already carries a ws(s):// scheme is used verbatim.
+ */
+function resolveServerUrl(): string {
+  const injected = (globalThis as { __LF_SERVER__?: string }).__LF_SERVER__;
+  const built = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_SERVER_URL;
+  const v = injected || built;
+  if (v) return /^wss?:\/\//.test(v) ? v : `${wsProto()}://${v.replace(/^\/+/, '')}/ws`;
+  return `${wsProto()}://${location.host}/ws`;
+}
+function wsProto(): string { return location.protocol === 'https:' ? 'wss' : 'ws'; }
+
 export class Net {
   private ws: WebSocket | null = null;
   private handlers = new Set<Handler>();
   private queue: ClientMsg[] = [];
 
   connect(): void {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    this.ws = new WebSocket(`${proto}://${location.host}/ws`);
+    this.ws = new WebSocket(resolveServerUrl());
     this.ws.onopen = () => {
       this.send({ t: 'hello', token: localStorage.getItem('lf_token') ?? undefined });
       for (const m of this.queue) this.send(m);

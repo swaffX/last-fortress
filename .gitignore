@@ -19,3 +19,7 @@ packages/client/public/models/**
 !packages/client/public/models/README.md
 # stray extracted asset packs (delete locally when unlocked)
 packages/client/public/Ultimate Stylized Nature*/
+
+# electron build output
+packages/desktop/dist/
+packages/desktop/release/
