@@ -346,9 +346,11 @@ export class World {
         const walk = mixer.clipAction(walkC);
         walk.play(); walk.setEffectiveWeight(0);
         t.actWalk = walk;
-      } else {
-        t.bobWalk = true;   // no distinct walk clip → procedural waddle
       }
+      // every GLB animal gets a procedural body bounce while moving — guarantees a
+      // sense of motion (legs come from the mixer when a walk clip exists; this sells
+      // the gait either way and hides snapshot-interpolation stutter)
+      t.bobWalk = true;
     }
     this.tracked.set(id, t);
     return t;
@@ -498,7 +500,8 @@ export class World {
   /** dt-based interpolation + prediction + procedural animation. */
   render(dt: number): void {
     this.time += dt;
-    this.lerpT = Math.min(1, this.lerpT + dt / this.frameInterval);
+    // 15% headroom so interpolation rarely finishes early then stalls (smooths stutter)
+    this.lerpT = Math.min(1, this.lerpT + dt / (this.frameInterval * 1.15));
 
     for (const [id, t] of this.tracked) {
       const isBuilding = t.kind.startsWith('building');
@@ -628,16 +631,19 @@ export class World {
     }
     t.mixer.update(dt);
     if (t.bobWalk) {
-      const inner = t.obj.userData.assetRoot as THREE.Object3D | undefined;
-      if (inner) {
+      const bob = t.obj.userData.bobNode as THREE.Object3D | undefined;
+      if (bob) {
         const baseY = (t.obj.userData.baseY as number) ?? 0;
+        const k = Math.min(1, dt * 8);
         if (moving) {
-          const ph = this.time * 11 + t.animT * 10;
-          inner.position.y = baseY + Math.abs(Math.sin(ph)) * 0.12;   // bounce
-          inner.rotation.z = Math.sin(ph) * 0.08;                     // waddle
+          const ph = this.time * 12 + t.animT * 10;
+          bob.position.y = baseY + Math.abs(Math.sin(ph)) * 0.09;   // hooved bounce
+          bob.rotation.z = Math.sin(ph) * 0.06;                     // side waddle
+          bob.rotation.x += (0.07 - bob.rotation.x) * k;            // lean into the stride
         } else {
-          inner.position.y += (baseY - inner.position.y) * Math.min(1, dt * 8);
-          inner.rotation.z += (0 - inner.rotation.z) * Math.min(1, dt * 8);
+          bob.position.y += (baseY - bob.position.y) * k;
+          bob.rotation.z += (0 - bob.rotation.z) * k;
+          bob.rotation.x += (0 - bob.rotation.x) * k;
         }
       }
     }

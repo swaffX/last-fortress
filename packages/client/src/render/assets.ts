@@ -70,15 +70,20 @@ export async function preloadAssets(): Promise<void> {
 export function assetInstance(name: string): THREE.Group | null {
   const a = cache.get(name);
   if (!a) return null;
+  // The skinned clone stays UNSCALED so the AnimationMixer deforms it correctly —
+  // scale/yaw/offset live on a wrapper above it. (Scaling a skinned root distorts skinning.)
   const inner = skeletonClone(a.scene) as THREE.Group;
-  inner.scale.setScalar(a.scale);
-  inner.rotation.y = a.yaw;
-  inner.position.y = a.yOffset;
-  inner.traverse(o => { if (o instanceof THREE.Mesh) { o.castShadow = true; o.receiveShadow = true; } });
+  inner.traverse(o => { if (o instanceof THREE.Mesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
+  const wrap = new THREE.Group();
+  wrap.scale.setScalar(a.scale);
+  wrap.rotation.y = a.yaw;
+  wrap.position.y = a.yOffset;
+  wrap.add(inner);
   const g = new THREE.Group();
-  g.add(inner);
+  g.add(wrap);
   g.userData.clips = a.clips;
-  g.userData.assetRoot = inner;
+  g.userData.assetRoot = inner;   // mixer target (unscaled)
+  g.userData.bobNode = wrap;      // procedural bob target
   g.userData.baseY = a.yOffset;
   return g;
 }
