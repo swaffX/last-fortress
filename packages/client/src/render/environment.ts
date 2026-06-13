@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  Rng, MAP_SIZE, CASTLE_POS, riverParams, riverYAt, inRiverBand,
+  Rng, MAP_SIZE, CAMP_POS, riverParams, riverYAt, inRiverBand,
   RIVER_WIDTH, BRIDGE_XS, generateDecor, type RiverParams, type Decor,
 } from '@lf/shared';
 import type { NodeView } from '../net';
@@ -51,7 +51,7 @@ function makeWaterTexture(): THREE.CanvasTexture {
 const STONE = 0x8d9299, STONE_DARK = 0x5c6168, WOOD_DARK = 0x5e4023;
 const RUIN = 0x6e6f6a, GRAVE = 0x9a9d9f, DEADWOOD = 0x4a3b2c, SWAMP = 0x2c3d2a;
 
-const CX = CASTLE_POS.x + 2, CY = CASTLE_POS.y + 2;
+const CX = CAMP_POS.x, CY = CAMP_POS.y;
 
 export class Environment {
   private root = new THREE.Group();

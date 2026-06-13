@@ -141,12 +141,68 @@ button { font-family: inherit; cursor: pointer; }
    aimed at the inventory bar. Only explicitly interactive widgets opt in. */
 #hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; font-size: 14px; }
 #hud > * { pointer-events: none; }
-#hud .build-bar, #hud .build-bar *,
+#hud .hotbar, #hud .hotbar *,
+#hud .backpack, #hud .backpack *,
 #hud .build-menu, #hud .build-menu *,
-#hud .choice-overlay, #hud .choice-overlay *,
 #hud .sel-panel .btn,
 #hud .chat-input,
 #hud .overlay, #hud .overlay * { pointer-events: auto; }
+
+/* ---- survival HUD ---- */
+.vitals {
+  position: absolute; left: 18px; bottom: 18px;
+  display: flex; flex-direction: column; gap: 6px; width: 230px;
+}
+.vital { display: flex; align-items: center; gap: 8px;
+  background: rgba(13,20,32,0.78); padding: 5px 9px; clip-path: var(--chamfer);
+  border: 1px solid var(--night-3); }
+.vital .ico { font-size: 15px; width: 18px; text-align: center; }
+.vital .track { flex: 1; height: 11px; background: rgba(7,11,18,0.85);
+  border-radius: 6px; overflow: hidden; }
+.vital .fill { height: 100%; transition: width 0.18s ease; }
+.vital.hp .fill { background: linear-gradient(90deg, #c43a31, #e05b4a); }
+.vital.hunger .fill { background: linear-gradient(90deg, #c08a3a, #e8b64c); }
+.vital.hunger .fill.low { background: linear-gradient(90deg, #c43a31, #e08a4a); }
+.vital .v { font-variant-numeric: tabular-nums; color: var(--parchment);
+  font-size: 12px; width: 26px; text-align: right; }
+
+.hotbar {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+  display: flex; gap: 5px; padding: 6px;
+  background: rgba(13,20,32,0.7); clip-path: var(--chamfer);
+  border: 1px solid var(--night-3); backdrop-filter: blur(5px);
+}
+.hotbar .slot, .backpack .slot {
+  position: relative; width: 48px; height: 48px;
+  background: rgba(7,11,18,0.7); border: 1px solid var(--night-3);
+  border-radius: 5px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; user-select: none;
+}
+.hotbar .slot.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+.hotbar .slot .key { position: absolute; top: 1px; left: 3px; font-size: 9px;
+  color: var(--steel); }
+.hotbar .slot .it-ico, .backpack .slot .it-ico { font-size: 22px; }
+.hotbar .slot .it-n, .backpack .slot .it-n {
+  position: absolute; bottom: 1px; right: 3px; font-size: 11px; font-weight: 700;
+  color: var(--parchment); text-shadow: 0 1px 2px #000; }
+
+.backpack {
+  position: absolute; left: 50%; bottom: 78px; transform: translateX(-50%);
+  background: rgba(13,20,32,0.92); padding: 12px; clip-path: var(--chamfer);
+  border: 1px solid var(--night-3); backdrop-filter: blur(8px);
+}
+.backpack .bp-title { color: var(--parchment); font-weight: 700; margin-bottom: 8px;
+  text-align: center; letter-spacing: 0.05em; }
+.backpack .bp-grid { display: grid; grid-template-columns: repeat(9, 48px); gap: 5px; }
+
+.region-name { color: var(--gold); font-weight: 700; letter-spacing: 0.04em; }
+.region-toast {
+  position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
+  font-family: var(--display, serif); font-size: 2rem; color: var(--parchment);
+  text-shadow: 0 2px 14px #000, 0 0 24px rgba(217,169,63,0.4);
+  opacity: 0; transition: opacity 0.5s ease;
+}
+.region-toast.show { opacity: 1; }
 
 .hud-top {
   position: absolute; top: 14px; left: 50%; transform: translateX(-50%);

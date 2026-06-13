@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { BuildingType, EnemyType, ClassType } from '@lf/shared';
+import type { BuildingType } from '@lf/shared';
 
 /**
  * Procedural low-poly models — no external assets.
@@ -186,352 +186,12 @@ export function buildingModel(type: BuildingType, tier: number): THREE.Group {
       }
       return group(box(0.9, 0.1, 0.9, WOOD, 0.05), g);
     }
-    case 'archer_tower': {
-      const h = 1.6 + t * 0.5;
-      const turret = new THREE.Group();
-      turret.position.y = h + 0.25;
-      // archer figurine + bow crossbar
-      turret.add(
-        at(box(0.22, 0.4, 0.16, 0x5e7a4a), 0, 0.2, 0),
-        at(new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 5), mat(0xd8b59a)), 0, 0.5, 0),
-        at(box(0.04, 0.5, 0.04, TRUNK), 0, 0.3, 0.18),
-      );
-      const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, h, 8),
-        woodMat(t >= 2 ? 0x9a8060 : 0xd0b890));
-      tower.position.y = h / 2;
-      const g = group(
-        tower,
-        at(box(1.3, 0.18, 1.3, WOOD_DARK), 0, h, 0),
-        crenels(1.3, h + 0.17, WOOD_DARK, 1.3),
-        turret,
-        cone(0.5, 0.6, ROOF, h + 1.1, 4),
-      );
-      if (t >= 1) g.add(at(box(0.08, h * 0.8, 0.08, IRON), 0.62, h * 0.4, 0.62),
-                        at(box(0.08, h * 0.8, 0.08, IRON), -0.62, h * 0.4, -0.62));
-      if (t >= 2) g.add(at(banner(h + 1.2), -0.6, 0, 0.6));
-      g.userData.turret = turret;
-      return g;
-    }
-    case 'crossbow_tower': {
-      const h = 1.4 + t * 0.45;
-      const turret = new THREE.Group();
-      turret.position.y = h + 0.3;
-      turret.add(
-        at(box(0.9, 0.14, 0.14, STEEL), 0, 0, 0),                   // bow arms
-        at(box(0.14, 0.14, 0.8, WOOD_DARK), 0, 0, 0.15),            // stock
-        at(box(0.5, 0.1, 0.06, IRON), 0, 0.12, 0.4),                // sight
-      );
-      const g = group(
-        box(1.1, h, 1.1, t >= 2 ? STONE_DARK : WOOD_DARK),
-        at(box(1.35, 0.16, 1.35, STONE_DARK), 0, h, 0),
-        crenels(1.35, h + 0.16, STONE_DARK, 1.35),
-        turret,
-      );
-      if (t >= 1) g.add(at(box(1.16, 0.12, 1.16, IRON), 0, h * 0.5, 0));
-      if (t >= 2) g.add(at(banner(h + 1), 0.62, 0, -0.62));
-      g.userData.turret = turret;
-      return g;
-    }
-    case 'bomb_tower': {
-      const h = 1.1 + t * 0.35;
-      const turret = new THREE.Group();
-      turret.position.y = h + 0.35;
-      const barrel = cyl(0.16, 0.22, 0.8, IRON, 0, 8);
-      barrel.rotation.x = -0.7;
-      barrel.position.set(0, 0.15, 0.2);
-      turret.add(barrel, new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), mat(0x2b2b30)));
-      const g = group(
-        cyl(0.75, 0.85, h, STONE),
-        at(box(0.9, 0.2, 0.9, STONE_DARK), 0, h, 0),
-        turret,
-      );
-      if (t >= 1) g.add(at(cyl(0.78, 0.78, 0.14, IRON), 0, h * 0.55, 0));
-      if (t >= 2) g.add(at(box(0.3, 0.3, 0.3, 0x2b2b30), 0.7, 0.15, 0.5),
-                        at(box(0.26, 0.26, 0.26, 0x2b2b30), 0.5, 0.13, 0.75));  // shell pile
-      g.userData.turret = turret;
-      return g;
-    }
-    case 'ice_tower': {
-      const h = 1.5 + t * 0.45;
-      const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.42 + t * 0.1), mat(ICE, ICE));
-      crystal.position.y = h + 0.55;
-      const g = group(
-        cyl(0.5, 0.7, h, 0x9fb8c8),
-        crystal,
-      );
-      for (let i = 0; i < 3 + t; i++) {
-        const shard = cone(0.1, 0.4, ICE, 0.2, 4);
-        const a = (i / (3 + t)) * Math.PI * 2;
-        shard.position.set(Math.cos(a) * 0.7, 0.2, Math.sin(a) * 0.7);
-        shard.rotation.z = (Math.random() - 0.5) * 0.5;
-        g.add(shard);
-      }
-      g.userData.spin = [crystal];
-      g.userData.pulse = [crystal];
-      return g;
-    }
-    case 'lightning_tower': {
-      const h = 1.8 + t * 0.5;
-      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.3 + t * 0.07, 8, 6), mat(ZAP, ZAP));
-      orb.position.y = h + 0.4;
-      const g = group(
-        cyl(0.4, 0.65, h, STONE_DARK),
-        orb,
-        cyl(0.04, 0.04, 0.7, STEEL, h + 0.75),
-      );
-      // coil rings
-      for (let i = 0; i < 2 + t; i++) {
-        g.add(at(cyl(0.46 - i * 0.06, 0.46 - i * 0.06, 0.06, IRON), 0, h * 0.35 + i * 0.3, 0));
-      }
-      g.userData.pulse = [orb];
-      return g;
-    }
-    case 'gold_mine': {
-      const g = group(
-        box(1.4, 0.8, 1.4, STONE),
-        cone(0.9, 0.8, WOOD_DARK, 1.2, 4),
-        at(new THREE.Mesh(new THREE.DodecahedronGeometry(0.25), mat(GOLD, GOLD)), 0, 0.95, 0),
-        at(box(0.5, 0.6, 0.1, WOOD_DARK), 0, 0.3, 0.71),            // entrance frame
-      );
-      if (t >= 1) g.add(at(new THREE.Mesh(new THREE.DodecahedronGeometry(0.16), mat(GOLD, GOLD)), 0.55, 0.12, 0.55));
-      if (t >= 2) g.add(at(banner(1.6, GOLD), -0.6, 0, -0.6));
-      return g;
-    }
-    case 'wood_camp': {
-      const g = group(
-        box(1.5, 0.7, 1.2, WOOD),
-        cone(1, 0.6, ROOF, 1.3, 4),
-        at(cyl(0.14, 0.14, 0.9, TRUNK, 0.45), 0.85, 0, 0),
-      );
-      // log pile grows with tier
-      for (let i = 0; i <= t; i++) {
-        const log = cyl(0.1, 0.1, 0.7, TRUNK, 0.1 + Math.floor(i / 2) * 0.18, 6);
-        log.rotation.z = Math.PI / 2;
-        log.position.set(-0.7, 0.1 + Math.floor(i / 2) * 0.18, 0.6 - (i % 2) * 0.22);
-        g.add(log);
-      }
-      if (t >= 2) g.add(at(box(0.5, 0.06, 0.06, STEEL), 0.85, 0.95, 0)); // axe blade
-      return g;
-    }
-    case 'stone_quarry': {
-      const g = group(
-        box(1.5, 0.6, 1.5, STONE_DARK),
-        at(new THREE.Mesh(new THREE.DodecahedronGeometry(0.4), mat(STONE)), 0, 0.85, 0),
-        at(new THREE.Mesh(new THREE.DodecahedronGeometry(0.26), mat(STONE)), 0.5, 0.7, 0.2),
-      );
-      if (t >= 1) g.add(at(new THREE.Mesh(new THREE.DodecahedronGeometry(0.2), mat(STONE)), -0.5, 0.7, -0.3));
-      if (t >= 2) g.add(at(box(0.08, 0.7, 0.08, WOOD_DARK), 0.6, 0.95, -0.5),
-                        at(box(0.3, 0.08, 0.08, IRON), 0.6, 1.3, -0.5)); // pickaxe
-      return g;
-    }
-    case 'healing_totem': {
-      const h = 1.4 + t * 0.3;
-      const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), mat(0x7fe08a, 0x7fe08a));
-      gem.position.y = h + 0.35;
-      const g = group(cyl(0.18, 0.26, h, TRUNK), gem);
-      // carved rings
-      for (let i = 0; i <= t; i++) {
-        g.add(at(cyl(0.24, 0.24, 0.06, 0x7fe08a), 0, h * 0.25 + i * 0.35, 0));
-      }
-      g.userData.spin = [gem];
-      g.userData.pulse = [gem];
-      return g;
-    }
-    case 'castle': {
-      const lvl = tier; // 1..5
-      const h = 2.4 + lvl * 0.5;
-      const g = new THREE.Group();
-      const flags: THREE.Mesh[] = [];
-      const pulse: THREE.Mesh[] = [];
-
-      // stepped stone plinth grounds the silhouette
-      g.add(at(new THREE.Mesh(new THREE.BoxGeometry(3.95, 0.3, 3.95), stoneMat(0x9aa2ac)), 0, 0.15, 0));
-      g.add(at(new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.25, 3.7), stoneMat(0xb4bcc6)), 0, 0.42, 0));
-
-      // main keep with corner buttresses
-      const keep = new THREE.Mesh(new THREE.BoxGeometry(3.3, h, 3.3), stoneMat(0xd2d8e0));
-      keep.position.y = h / 2 + 0.4;
-      g.add(keep);
-      for (const [bx, bz] of [[-1.45, 0], [1.45, 0], [0, -1.45]] as const) {
-        const but = new THREE.Mesh(new THREE.BoxGeometry(bx === 0 ? 1 : 0.5, h * 0.7, bz === 0 ? 1 : 0.5),
-          stoneMat(0xbfc7d1));
-        but.position.set(bx, h * 0.35 + 0.4, bz);
-        g.add(but);
-      }
-      // walkway ring + battlements
-      g.add(at(box(3.7, 0.28, 3.7, STONE_DARK), 0, h + 0.4, 0));
-      const cren = crenels(3.7, h + 0.68, STONE_DARK, 3.7);
-      g.add(cren);
-      const crenSide = crenels(3.7, h + 0.68, STONE_DARK, 0.24);
-      crenSide.rotation.y = Math.PI / 2;
-      g.add(crenSide);
-
-      // gatehouse: twin drum towers flanking an arched gate with portcullis
-      for (const gx of [-0.85, 0.85]) {
-        const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, h * 0.75, 8), stoneMat(0xc8cfd8));
-        drum.position.set(gx, h * 0.37 + 0.4, 1.7);
-        const dcap = cone(0.52, 0.6, ROOF, h * 0.75 + 0.65, 8);
-        dcap.position.set(gx, h * 0.75 + 0.68, 1.7);
-        g.add(drum, dcap);
-      }
-      g.add(at(box(1.1, 1.5, 0.2, WOOD_DARK), 0, 1.15, 1.78));          // gate door
-      for (let i = -2; i <= 2; i++) {                                   // portcullis bars
-        g.add(at(box(0.05, 1.3, 0.04, IRON), i * 0.2, 1.2, 1.9));
-      }
-      g.add(at(box(0.05, 0.05, 0.04, IRON), 0, 1.6, 1.9));
-      g.add(at(box(1.3, 0.22, 0.34, IRON), 0, 2.0, 1.82));              // lintel
-      // braziers at the gate — warm glow
-      for (const gx of [-1.3, 1.3]) {
-        const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.08, 0.14, 6), mat(0x3a3f45));
-        bowl.position.set(gx, 0.95, 2.05);
-        const fire = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.24, 5), mat(0xffaa33, 0xff8c3b));
-        fire.position.set(gx, 1.12, 2.05);
-        g.add(at(cyl(0.04, 0.05, 0.85, IRON, 0.45), gx, 0, 2.05), bowl, fire);
-        pulse.push(fire);
-      }
-
-      // corner towers: taller drums, tiled conical roofs, arrow slits
-      for (const [dx, dz] of [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]]) {
-        const th = h + 1.1;
-        const tw = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.6, th, 8), stoneMat(0xc8cfd8));
-        tw.position.set(dx!, th / 2 + 0.3, dz!);
-        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.14, 8), stoneMat(0x9aa2ac));
-        ring.position.set(dx!, th + 0.3, dz!);
-        const cap = cone(0.62, 0.85, ROOF, th + 0.85, 8);
-        cap.position.set(dx!, th + 0.85, dz!);
-        const tip = at(new THREE.Mesh(new THREE.SphereGeometry(0.07, 5, 4), mat(GOLD)), dx!, th + 1.32, dz!);
-        g.add(tw, ring, cap, tip);
-        g.add(at(box(0.08, 0.32, 0.05, 0x1a222e), dx! * 1.02, th * 0.6, dz! + (dz! > 0 ? 0.56 : -0.56)));
-        if (lvl >= 2) {
-          const b = banner(1);
-          b.position.set(dx!, th + 0.85, dz!);
-          g.add(b);
-          flags.push(b.userData.flagMesh as THREE.Mesh);
-        }
-      }
-
-      // lit windows on every face
-      for (const dz of [1.67, -1.67]) {
-        for (const dx of [-0.55, 0.55]) {
-          g.add(at(box(0.18, 0.45, 0.05, 0xffd9a0, 0), dx, h * 0.62 + 0.4, dz));
-        }
-      }
-      for (const dx of [1.67, -1.67]) {
-        g.add(at(box(0.05, 0.45, 0.18, 0xffd9a0, 0), dx, h * 0.62 + 0.4, 0));
-      }
-
-      // levels 3+: tiled inner roof; 4+: tall central spire; 5: radiant golden orb
-      if (lvl >= 3) g.add(cone(1.3, 1.1, ROOF, h + 0.95, 4));
-      if (lvl >= 4) {
-        const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, h + 1.7, 8), stoneMat(0xd2d8e0));
-        spire.position.y = (h + 1.7) / 2 + 0.4;
-        g.add(spire, cone(0.68, 1, ROOF, h + 2.4, 8));
-        const sb = banner(1.2);
-        sb.position.set(0, h + 2.7, 0);
-        g.add(sb);
-        flags.push(sb.userData.flagMesh as THREE.Mesh);
-      }
-      if (lvl >= 5) {
-        const orb = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), mat(GOLD, GOLD));
-        orb.position.y = h + 3.3;
-        g.add(orb);
-        pulse.push(orb);
-      }
-
-      g.traverse(o => { if (o instanceof THREE.Mesh) { o.castShadow = true; o.receiveShadow = true; } });
-      g.userData.flags = flags;
-      g.userData.pulse = pulse;
-      return g;
-    }
   }
 }
 
-/** ground ring color per enemy type — instant silhouette readability */
-const RING_COLORS: Record<EnemyType, number> = {
-  normal: 0x8aa84f, fast: 0xcfe06a, tank: 0x4f6b45,
-  spitter: 0x6fd86a, exploding: 0xff7733, butcher: 0xc43a31,
-};
 
-export function enemyModel(type: EnemyType): THREE.Group {
-  const g = enemyBody(type);
-  // type-colored ring under the feet
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.5, 0.66, 12),
-    new THREE.MeshBasicMaterial({
-      color: RING_COLORS[type], transparent: true, opacity: 0.45, depthWrite: false,
-    }));
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.05;
-  ring.scale.setScalar(type === 'butcher' ? 1.8 : type === 'tank' ? 1.3 : 1);
-  g.add(ring);
-  return g;
-}
-
-function enemyBody(type: EnemyType): THREE.Group {
-  switch (type) {
-    case 'normal': return zombie(0x6f8f57, 0.6);
-    case 'fast': return zombie(0x8fae5a, 0.5, { lean: 0.5 });
-    case 'tank': return zombie(0x4f6b45, 1.0, { bigArms: true });
-    case 'spitter': return zombie(0x7da05f, 0.6, { head: 0x9fce6a, sack: true });
-    case 'exploding': return zombie(0xb86f3a, 0.6, { head: 0xe85b2a, glow: true });
-    case 'butcher': {
-      const g = zombie(0x5d4a4a, 1.7, { bigArms: true });
-      const blade = box(0.2, 1.4, 0.5, 0x9aa3ab, 0.2);
-      blade.position.x = 0.55;
-      // attach cleaver to right arm so attack lunge swings it
-      (g.userData.arms as THREE.Mesh[])[1]!.add(blade);
-      const hook = box(0.08, 0.5, 0.08, IRON, 0.1);
-      hook.position.x = -0.5;
-      (g.userData.arms as THREE.Mesh[])[0]!.add(hook);
-      // apron
-      g.add(at(box(0.5, 0.7, 0.05, 0x7a3328), 0, 0.85, 0.27));
-      return g;
-    }
-  }
-}
-
-function zombie(color: number, scale: number,
-                opts: { lean?: number; bigArms?: boolean; head?: number;
-                        glow?: boolean; sack?: boolean } = {}): THREE.Group {
-  const body = box(0.6, 0.9, 0.4, color, 0.75);
-  if (opts.lean) body.rotation.x = opts.lean * 0.5;
-  const headMat = opts.glow ? mat(opts.head ?? color, opts.head ?? color) : mat(opts.head ?? color);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), headMat);
-  head.position.y = 1.42;
-  head.rotation.z = 0.12;
-  // glowing red eyes — readable even at night
-  for (const ex of [-0.1, 0.1]) {
-    head.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.02), mat(0xff2a1a, 0xff2a1a)), ex, 0.05, 0.22));
-  }
-
-  const legL = box(0.18, 0.55, 0.18, color, -0.26);
-  legL.position.set(-0.18, 0.55, 0);
-  const legR = box(0.18, 0.55, 0.18, color, -0.26);
-  legR.position.set(0.18, 0.55, 0);
-
-  const armW = opts.bigArms ? 0.24 : 0.16;
-  const armL = box(armW, 0.6, armW, color, -0.25);
-  armL.position.set(-(0.3 + armW / 2), 1.15, 0.1);
-  armL.rotation.x = -0.9; // zombie reach
-  const armR = box(armW, 0.6, armW, color, -0.25);
-  armR.position.set(0.3 + armW / 2, 1.15, 0.1);
-  armR.rotation.x = -0.9;
-
-  const parts: THREE.Object3D[] = [body, head, legL, legR, armL, armR];
-  if (opts.sack) {
-    parts.push(at(new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5), mat(0xbfe07a, 0xbfe07a)), 0, 0.85, -0.3));
-  }
-  const g = group(...parts);
-  g.scale.setScalar(scale * 1.2);
-  g.userData.legs = [legL, legR];
-  g.userData.arms = [armL, armR];
-  g.userData.body = body;
-  g.userData.head = head;
-  return g;
-}
-
-export function playerModel(klass: ClassType): THREE.Group {
-  const knight = klass === 'knight';
+export function playerModel(): THREE.Group {
+  const knight = false;   // classless survivor — ranger silhouette
   const armor = knight ? 0x9fb2c8 : 0x5e7a4a;
   const armorDark = knight ? 0x6a7d96 : 0x42583a;
   const trim = knight ? GOLD : 0xb8742a;
@@ -786,4 +446,40 @@ export function rockModel(): THREE.Group {
   moss.position.set(-0.05, 0.62, -0.05);
   moss.scale.set(1, 0.35, 1);
   return group(main, s1, s2, moss);
+}
+
+/** Berry bush — leafy mound with red berries. */
+export function bushModel(): THREE.Group {
+  const blobs: THREE.Mesh[] = [];
+  for (const [x, y, z, r] of [[0, 0.3, 0, 0.34], [0.28, 0.24, 0.1, 0.24],
+                              [-0.24, 0.22, -0.12, 0.22], [0.05, 0.46, -0.05, 0.22]] as const) {
+    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), mat(0x3b6b30));
+    b.position.set(x, y, z); b.scale.y = 0.8;
+    blobs.push(b);
+  }
+  const g = group(...blobs);
+  for (let i = 0; i < 7; i++) {
+    const berry = new THREE.Mesh(new THREE.SphereGeometry(0.05, 5, 4), mat(0xc23a4a));
+    berry.position.set((Math.random() - 0.5) * 0.6, 0.2 + Math.random() * 0.35, (Math.random() - 0.5) * 0.6);
+    g.add(berry);
+  }
+  g.userData.sway = blobs;
+  return g;
+}
+
+const ITEM_COLOR: Record<string, number> = {
+  wood: 0x9c6b35, stone: 0x8d9299, berry: 0xc23a4a,
+};
+
+/** Small bobbing pickup on the ground. */
+export function itemModel(item: string): THREE.Group {
+  const color = ITEM_COLOR[item] ?? 0xcccccc;
+  let mesh: THREE.Mesh;
+  if (item === 'berry') mesh = new THREE.Mesh(new THREE.SphereGeometry(0.16, 7, 6), mat(color, color));
+  else if (item === 'stone') mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18), mat(color));
+  else mesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.18, 0.18), mat(color));
+  mesh.position.y = 0.3;
+  const g = group(mesh);
+  g.userData.bob = mesh;
+  return g;
 }

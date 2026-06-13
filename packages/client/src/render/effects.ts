@@ -31,45 +31,16 @@ export class Effects {
   handle(events: SimEvent[]): void {
     for (const e of events) {
       switch (e.kind) {
-        case 'projectile': {
-          // arrows/bolts/spit/bombs fly as real entities now — no instant beam.
-          // Only the ice tower keeps its frost-ray visual.
-          if (e.weapon === 'ice') {
-            this.tracer(e.from.x, e.from.y, e.to.x, e.to.y, 0x7cc7e8);
-            this.burst(e.to.x, e.to.y, 0x7cc7e8, 4, 0.3, 2);
-          } else if (e.weapon !== 'spit') {
-            this.flash(e.from.x, 1.6, e.from.y, 0xffd9a0);   // muzzle flash only
-          }
-          break;
-        }
-        case 'explosion':
-          this.burst(e.pos.x, e.pos.y, 0xff8c3b, Math.round(10 * e.radius), 0.5, 5);
-          this.burst(e.pos.x, e.pos.y, 0xffd24a, Math.round(5 * e.radius), 0.3, 6);
-          this.burst(e.pos.x, e.pos.y, 0x57514a, Math.round(6 * e.radius), 0.9, 3);
-          this.shockwave(e.pos.x, e.pos.y, e.radius * 1.6, 0xffaa55);
-          this.flash(e.pos.x, 0.7, e.pos.y, 0xffe9b0);
-          this.stage.addShake(0.25 + e.radius * 0.1);
-          break;
         case 'damage':
-          // light blood spritz, budgeted so hordes don't drown the GPU
           if (this.bloodBudget > 0 && e.amount >= 8) {
             this.bloodBudget--;
             this.burst(e.pos.x, e.pos.y, 0x8a2f25, 3, 0.35, 2.2);
           }
           break;
-        case 'chain': {
-          for (let i = 0; i + 1 < e.points.length; i++) {
-            this.bolt(e.points[i]!.x, e.points[i]!.y, e.points[i + 1]!.x, e.points[i + 1]!.y);
-          }
-          break;
-        }
-        case 'death':
+        case 'player_died':
           this.burst(e.pos.x, e.pos.y, 0x8a2f25, 8, 0.6, 3.5);
-          this.burst(e.pos.x, e.pos.y, 0x5d6b48, 4, 0.5, 2.5);
-          if (e.enemy === 'butcher') {
-            this.stage.addShake(0.8);
-            this.shockwave(e.pos.x, e.pos.y, 4, 0xc43a31);
-          }
+          this.shockwave(e.pos.x, e.pos.y, 2, 0xc43a31);
+          this.stage.addShake(0.4);
           break;
         case 'building_destroyed':
           this.burst(e.pos.x + 0.5, e.pos.y + 0.5, 0x8d9299, 14, 0.9, 4);
@@ -81,9 +52,8 @@ export class Effects {
           this.burst(e.pos.x + 0.5, e.pos.y + 0.5, 0xd9b88a, 8, 0.4, 2.5);
           this.shockwave(e.pos.x + 0.5, e.pos.y + 0.5, 1.4, 0xd9b88a);
           break;
-        case 'splash':
-          this.burst(e.pos.x, e.pos.y, 0x9fd4f0, 5, 0.35, 2.2);
-          this.shockwave(e.pos.x, e.pos.y, 0.9, 0x9fd4f0);
+        case 'item_drop':
+          this.burst(e.pos.x, e.pos.y, 0xd9b88a, 4, 0.3, 1.8);
           break;
       }
     }

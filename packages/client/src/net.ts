@@ -2,7 +2,7 @@ import type { ClientMsg, ServerMsg } from '../../server/src/protocol';
 
 export type { ClientMsg, ServerMsg };
 export type {
-  BuildingView, EnemyView, PlayerView, NodeView, ProjectileView, ProfileView,
+  BuildingView, PlayerView, NodeView, GroundItemView, ProfileView,
 } from '../../server/src/protocol';
 
 type Handler = (msg: ServerMsg) => void;

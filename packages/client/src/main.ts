@@ -1,7 +1,7 @@
 import './style.css';
 import * as THREE from 'three';
-import { riverParams, generateDecor, BUILDINGS } from '@lf/shared';
-import { Net, type ServerMsg, type ProfileView, type BuildingView, type NodeView } from './net';
+import { riverParams, generateDecor } from '@lf/shared';
+import { Net, type ServerMsg, type ProfileView, type BuildingView, type NodeView, type PlayerView } from './net';
 import { Stage } from './render/scene';
 import { World } from './render/world';
 import { Effects } from './render/effects';
@@ -9,6 +9,7 @@ import { Environment } from './render/environment';
 import { Audio } from './audio';
 import { Hud } from './ui/hud';
 import { Screens } from './ui/screens';
+import { createInventoryUI } from './ui/inventory';
 import { Input } from './input';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -18,6 +19,8 @@ const effects = new Effects(stage.scene, stage);
 const audio = new Audio();
 const hud = new Hud();
 const screens = new Screens();
+const inventory = createInventoryUI(
+  document.getElementById('hotbar-slot')!, document.getElementById('backpack-slot')!);
 const input = new Input(stage, canvas);
 const net = new Net();
 
@@ -27,42 +30,32 @@ let inGame = false;
 let lastFrameBuildings: BuildingView[] = [];
 let lastNodes: NodeView[] = [];
 let selfId = -1;
+let selfView: PlayerView | undefined;
 // gathering progress: node id → { remaining, total, lastHitAt }
 const nodeProgress = new Map<number, { remaining: number; total: number; lastHitAt: number }>();
 
 // ---- wiring: screens → net ----
-screens.onCreate = (klass, solo) => { audio.unlock(); net.send({ t: 'create_lobby', klass, solo }); };
-screens.onJoin = (code, klass) => { audio.unlock(); net.send({ t: 'join_lobby', code, klass }); };
+screens.onCreate = solo => { audio.unlock(); net.send({ t: 'create_lobby', solo }); };
+screens.onJoin = code => { audio.unlock(); net.send({ t: 'join_lobby', code }); };
 screens.onStart = () => net.send({ t: 'start_game' });
 screens.onUnlockSkill = id => net.send({ t: 'unlock_skill', skillId: id });
-screens.onPlayAgain = () => location.reload();
-screens.onRestartVote = () => net.send({ t: 'restart_vote' });
-screens.onMainMenu = () => { net.send({ t: 'leave' }); screens.menu(profile); };
-hud.onVote = option => net.send({ t: 'vote', option });
 
-// ---- wiring: hud/input → net ----
+// ---- wiring: hud / inventory / input → net ----
 hud.onBuildSelect = type => input.setBuildType(type);
-hud.onUpgrade = id => net.send({ t: 'cmd', cmd: { kind: 'upgrade', buildingId: id } });
 hud.onDemolish = id => {
   net.send({ t: 'cmd', cmd: { kind: 'demolish', buildingId: id } });
   hud.selectBuilding(null);
 };
+inventory.onMove = (from, to) => net.send({ t: 'cmd', cmd: { kind: 'move_item', from, to } });
+inventory.onDrop = (slot, count) => net.send({ t: 'cmd', cmd: { kind: 'drop_item', slot, count } });
+inventory.onSelectHand = slot => net.send({ t: 'cmd', cmd: { kind: 'select_hand', slot } });
 input.send = cmd => net.send({ t: 'cmd', cmd });
 input.ping = pos => net.send({ t: 'ping', pos });
 input.onBuildCancel = () => hud.clearBuild();
-hud.onToolUpgrade = tool => net.send({ t: 'cmd', cmd: { kind: 'upgrade_tool', tool } });
-hud.onCombatUpgrade = () => net.send({ t: 'cmd', cmd: { kind: 'upgrade_combat' } });
-world.onBuildingHit = (x, z) => effects.gatherHit(x, z, 'stone');   // dust puff on struck walls
-let prevCombatLevel = 0;
-let prevTools = { axe: 1, pick: 1 };
+world.onBuildingHit = (x, z) => effects.gatherHit(x, z, 'stone');
 input.onSelectAt = cell => {
-  // exact footprint match — assuming 2x2 for walls made a selected wall
-  // swallow clicks meant for its neighbour
-  const b = lastFrameBuildings.find(bb => {
-    const s = BUILDINGS[bb.type].size;
-    return cell.x >= bb.pos.x && cell.x < bb.pos.x + s &&
-           cell.y >= bb.pos.y && cell.y < bb.pos.y + s;
-  });
+  const b = lastFrameBuildings.find(bb =>
+    cell.x >= bb.pos.x && cell.x < bb.pos.x + 1 && cell.y >= bb.pos.y && cell.y < bb.pos.y + 1);
   hud.selectBuilding(b ?? null);
 };
 
@@ -82,8 +75,6 @@ net.on((msg: ServerMsg) => {
       break;
     case 'game_start':
       inGame = true;
-      prevCombatLevel = 0;
-      prevTools = { axe: 1, pick: 1 };
       selfId = msg.selfId;
       world.reset();
       world.selfId = msg.selfId;
@@ -95,46 +86,48 @@ net.on((msg: ServerMsg) => {
         world.decor = decorList;
         input.decor = decorList;
       }
-      hud.hideChoice();
       lastNodes = msg.nodes;
       world.setNodes(msg.nodes);
       input.nodes = msg.nodes;
       nodeProgress.clear();
-      for (const n of msg.nodes) {
-        nodeProgress.set(n.id, { remaining: n.amount, total: n.amount, lastHitAt: 0 });
-      }
+      for (const n of msg.nodes) nodeProgress.set(n.id, { remaining: n.amount, total: n.amount, lastHitAt: 0 });
       env?.dispose();
       env = new Environment(stage.scene, msg.seed, msg.nodes);
       hud.initMinimapTerrain(msg.seed, msg.nodes);
       screens.clear();
       hud.show();
-      hud.banner('The Watch Begins', false);
+      hud.banner('You awaken in the wild');
       audio.setPhase('day');
       break;
     case 'frame': {
       lastFrameBuildings = msg.buildings;
       input.buildings = msg.buildings;
       world.colliders = { buildings: msg.buildings, nodes: lastNodes };
-      // node depletion: drop rendered nodes the sim no longer reports via gather
-      world.applyFrame(msg.players, msg.enemies, msg.buildings, msg.projectiles);
+      world.applyFrame(msg.players, msg.buildings, msg.groundItems);
+      selfView = msg.players.find(p => p.id === selfId);
       for (const e of msg.events) {
-        if (e.kind === 'projectile') world.aimTower(e.from, e.to);
         if (e.kind === 'melee') world.lungePlayerAt(e.pos.x, e.pos.y);
         if (e.kind === 'gather') {
-          world.gatherSwing(e.pos.x, e.pos.y, e.resource);
-          effects.gatherHit(e.pos.x, e.pos.y, e.resource);
+          world.gatherSwing(e.pos.x, e.pos.y, e.resource as 'wood' | 'stone' | 'berry');
+          effects.gatherHit(e.pos.x, e.pos.y, e.resource === 'stone' ? 'stone' : 'wood');
           const np = nodeProgress.get(e.nodeId);
           if (np) { np.remaining = e.remaining; np.lastHitAt = performance.now(); }
         }
         if (e.kind === 'node_depleted') {
-          const wasTree = lastNodes.find(n => n.id === e.nodeId)?.kind ?? 'tree';
-          world.breakNode(e.nodeId, wasTree);
-          effects.nodeBreak(e.pos.x + 0.5, e.pos.y + 0.5, wasTree);
-          if (wasTree === 'tree') audio.treeFall(); else audio.rockBreak();
+          const kind = lastNodes.find(n => n.id === e.nodeId)?.kind ?? 'tree';
+          world.breakNode(e.nodeId, kind);
+          effects.nodeBreak(e.pos.x + 0.5, e.pos.y + 0.5, kind === 'rock' ? 'rock' : 'tree');
+          if (kind === 'tree') audio.treeFall(); else audio.rockBreak();
           lastNodes = lastNodes.filter(n => n.id !== e.nodeId);
           input.nodes = lastNodes;
           hud.removeMinimapNode(e.nodeId);
           nodeProgress.delete(e.nodeId);
+        }
+        if (e.kind === 'region_enter' && e.id === selfId) hud.regionToast(e.region);
+        if (e.kind === 'player_respawn' && e.id === selfId) hud.banner('You respawn at camp');
+        if (e.kind === 'phase_change') {
+          hud.banner(e.phase === 'night' ? 'Night falls' : 'Dawn breaks');
+          if (e.phase === 'night') hud.notify('Danger rises after dark.');
         }
       }
       effects.handle(msg.events);
@@ -142,31 +135,14 @@ net.on((msg: ServerMsg) => {
       audio.setPhase(msg.phase);
       stage.setNight(msg.phase === 'night');
       stage.setGameTick(msg.tick);
-      const castle = msg.buildings.find(b => b.type === 'castle');
-      hud.updateFrame(msg.wave, msg.phase, msg.phaseTicks, msg.resources,
-        msg.players, msg.enemies, msg.buildings, castle?.tier ?? 1, selfId);
+      hud.updateFrame(selfView, msg.players, msg.buildings, msg.phase, msg.phaseTicks, selfId);
       hud.handleEvents(msg.events, project);
-      {
-        const self = msg.players.find(p => p.id === selfId);
-        if (self) {
-          const roman = ['', 'I', 'II', 'III'];
-          if (self.combatLevel > prevCombatLevel) {
-            const milestone = self.combatLevel % 5 === 0;
-            hud.slotPopup('inv-strike',
-              milestone ? `⚔️ Lv ${self.combatLevel} — DMG + SPEED!` : `⚔️ Strike Lv ${self.combatLevel}!`);
-          }
-          if (self.axeTier > prevTools.axe) hud.slotPopup('inv-axe', `🪓 Axe Tier ${roman[self.axeTier]}!`);
-          if (self.pickTier > prevTools.pick) hud.slotPopup('inv-pick', `⛏ Pick Tier ${roman[self.pickTier]}!`);
-          prevCombatLevel = self.combatLevel;
-          prevTools = { axe: self.axeTier, pick: self.pickTier };
-        }
-      }
+      if (selfView) inventory.setData(selfView.inventory, selfView.equipment, selfView.hand);
       break;
     }
-    case 'ping': {
+    case 'ping':
       hud.notify(`📍 ${msg.from} pinged`);
       break;
-    }
     case 'chat':
       hud.addChat(msg.from, msg.text);
       break;
@@ -175,25 +151,6 @@ net.on((msg: ServerMsg) => {
       break;
     case 'ghost':
       world.setRemoteGhost(msg.type, msg.pos, msg.ok);
-      break;
-    case 'choice_offer':
-      hud.showChoiceDelayed(msg.options);   // waits out the dawn banner
-      break;
-    case 'choice_state':
-      hud.updateChoiceVotes(msg.votes);
-      break;
-    case 'choice_applied':
-      hud.hideChoice();
-      hud.notify(`⚜ ${msg.option.name} — ${msg.option.desc}`);
-      break;
-    case 'game_over':
-      inGame = false;
-      hud.hide();
-      hud.hideChoice();
-      screens.gameOver(msg.wave, msg.coinsEarned, msg.skillPointsEarned);
-      break;
-    case 'restart_state':
-      screens.setRestartVotes(msg.votes, msg.needed);
       break;
     case 'lobby_closed':
       inGame = false;
@@ -223,12 +180,9 @@ hud.onChat = text => net.send({ t: 'chat', text });
 // ---- loops ----
 setInterval(() => { if (inGame) input.tick(); }, 50);
 
-// latency probe + teammate ghost sync
 let lastPing: number | null = null;
-setInterval(() => {
-  if (!inGame) return;
-  net.send({ t: 'latency', n: performance.now() });
-}, 2000);
+setInterval(() => { if (inGame) net.send({ t: 'latency', n: performance.now() }); }, 2000);
+
 let lastGhostSent = '';
 setInterval(() => {
   if (!inGame) return;
@@ -240,9 +194,10 @@ setInterval(() => {
   net.send({ t: 'ghost', type, pos: cell, ok: input.ghostOk });
 }, 120);
 
+let nearNodeId: number | null = null;
+
 addEventListener('keydown', e => {
   if (!inGame) return;
-  // chat handling first — input field swallows everything else
   if (hud.chatOpen) {
     if (e.key === 'Enter') hud.closeChat(true);
     if (e.key === 'Escape') hud.closeChat(false);
@@ -250,13 +205,18 @@ addEventListener('keydown', e => {
   }
   if (e.key === 'Enter') { hud.openChat(); e.preventDefault(); return; }
   if (e.target instanceof HTMLInputElement) return;
-  if (e.key.toLowerCase() === 'e') net.send({ t: 'cmd', cmd: { kind: 'gather' } });
-  if (e.key.toLowerCase() === 'b') hud.toggleBuildMenu();
-  if (e.key === 'Escape') { hud.clearBuild(); hud.selectBuilding(null); hud.toggleBuildMenu(false); }
-  if (e.key.toLowerCase() === 'k' && profile) screens.skillTree(profile, true);
-  if (e.key.toLowerCase() === 'u' && hud.selected !== null) {
-    net.send({ t: 'cmd', cmd: { kind: 'upgrade', buildingId: hud.selected } });
+  const k = e.key.toLowerCase();
+  if (k === 'e') {
+    // context: gather a nearby node, else eat what's in hand
+    if (nearNodeId !== null) net.send({ t: 'cmd', cmd: { kind: 'gather' } });
+    else net.send({ t: 'cmd', cmd: { kind: 'eat' } });
   }
+  if (k === 'i') inventory.toggle();
+  if (k === 'b') hud.toggleBuildMenu();
+  if (k === 'q') net.send({ t: 'cmd', cmd: { kind: 'eat' } });   // quick-eat
+  if (e.key >= '1' && e.key <= '9') net.send({ t: 'cmd', cmd: { kind: 'select_hand', slot: Number(e.key) - 1 } });
+  if (e.key === 'Escape') { hud.clearBuild(); hud.selectBuilding(null); hud.toggleBuildMenu(false); inventory.toggle(false); }
+  if (k === 'k' && profile) screens.skillTree(profile, true);
 });
 
 canvas.addEventListener('wheel', e => {
@@ -270,7 +230,6 @@ let fpsAccum = 0, fpsCount = 0, fpsTimer = 0;
 function loop(now: number): void {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  // fps counter (1 s window)
   fpsAccum += dt; fpsCount++;
   fpsTimer += dt;
   if (fpsTimer >= 1) {
@@ -282,58 +241,46 @@ function loop(now: number): void {
     world.setSelfDir(d.x, d.y);
   }
   world.render(dt);
-  // camera follows the predicted self position every display frame (no tick stutter)
   const selfPos = world.positionOf(selfId);
-  if (selfPos) {
+  if (selfPos && inGame) {
     stage.setFollow(selfPos.x, selfPos.z);
     // gather prompt + golden ring on the node E would hit
-    if (inGame) {
-      let near: NodeView | null = null;
-      let nd = 2.2;
-      for (const n of lastNodes) {
-        const d = Math.hypot(n.pos.x + 0.5 - selfPos.x, n.pos.y + 0.5 - selfPos.z);
-        if (d <= nd) { nd = d; near = n; }
-      }
-      if (near) {
-        const np = nodeProgress.get(near.id);
-        const channeling = np && performance.now() - np.lastHitAt < 900;
-        if (channeling && np) {
-          hud.showPrompt(near.kind === 'tree' ? '🪓 Chopping…' : '⛏ Mining…',
-            1 - np.remaining / np.total);
-        } else {
-          hud.showPrompt(`[E] ${near.kind === 'tree' ? '🪓 Chop wood' : '⛏ Mine stone'}`);
-        }
-      } else {
-        hud.showPrompt(null);
-      }
-      world.highlightNode(near?.id ?? null);
+    let near: NodeView | null = null;
+    let nd = 2.2;
+    for (const n of lastNodes) {
+      const d = Math.hypot(n.pos.x + 0.5 - selfPos.x, n.pos.y + 0.5 - selfPos.z);
+      if (d <= nd) { nd = d; near = n; }
+    }
+    nearNodeId = near?.id ?? null;
+    if (near) {
+      const np = nodeProgress.get(near.id);
+      const channeling = np && performance.now() - np.lastHitAt < 900;
+      const verb = near.kind === 'tree' ? '🪓 Chop wood' : near.kind === 'rock' ? '⛏ Mine stone' : '🫐 Pick berries';
+      if (channeling && np) hud.showPrompt(near.kind === 'tree' ? '🪓 Chopping…' : near.kind === 'rock' ? '⛏ Mining…' : '🫐 Picking…', 1 - np.remaining / np.total);
+      else hud.showPrompt(`[E] ${verb}`);
+    } else {
+      const hand = selfView?.inventory[selfView.hand];
+      hud.showPrompt(hand && hand.item === 'berry' ? '[E] 🍖 Eat berry' : null);
+    }
+    world.highlightNode(near?.id ?? null);
 
-      // hover affordance on placed buildings (outside build mode)
-      if (!input.activeType) {
-        const w = stage.screenToWorld(input.cursor.x, input.cursor.y);
-        const cell = { x: Math.floor(w.x), y: Math.floor(w.y) };
-        const hovered = lastFrameBuildings.find(b => {
-          const s = b.type === 'castle' ? 4 : BUILDINGS[b.type].size;
-          return cell.x >= b.pos.x && cell.x < b.pos.x + s &&
-                 cell.y >= b.pos.y && cell.y < b.pos.y + s;
-        }) ?? null;
-        world.setHover(hovered);
-        document.body.style.cursor = hovered ? 'pointer' : '';
-      } else {
-        world.setHover(null);
-        document.body.style.cursor = '';
-      }
+    // hover affordance on placed buildings (outside build mode)
+    if (!input.activeType) {
+      const w = stage.screenToWorld(input.cursor.x, input.cursor.y);
+      const cell = { x: Math.floor(w.x), y: Math.floor(w.y) };
+      const hovered = lastFrameBuildings.find(b =>
+        cell.x >= b.pos.x && cell.x < b.pos.x + 1 && cell.y >= b.pos.y && cell.y < b.pos.y + 1) ?? null;
+      world.setHover(hovered);
+      document.body.style.cursor = hovered ? 'pointer' : '';
+    } else {
+      world.setHover(null);
+      document.body.style.cursor = '';
+    }
 
-      // keep the selection panel pinned above its building
-      if (hud.selected !== null) {
-        const b = lastFrameBuildings.find(bb => bb.id === hud.selected);
-        if (b) {
-          const s = BUILDINGS[b.type].size;
-          hud.moveSelPanel(project(b.pos.x + s / 2, b.pos.y));
-        } else {
-          hud.selectBuilding(null);   // destroyed while selected
-        }
-      }
+    if (hud.selected !== null) {
+      const b = lastFrameBuildings.find(bb => bb.id === hud.selected);
+      if (b) hud.moveSelPanel(project(b.pos.x + 0.5, b.pos.y));
+      else hud.selectBuilding(null);
     }
   }
   effects.update(dt);
@@ -345,4 +292,3 @@ function loop(now: number): void {
 requestAnimationFrame(loop);
 
 net.connect();
-void lastNodes; // retained for future node-depletion sync

@@ -27,26 +27,17 @@ export class Audio {
   handle(events: SimEvent[]): void {
     for (const e of events) {
       switch (e.kind) {
-        case 'projectile':
-          if (e.weapon === 'arrow' || e.weapon === 'bolt') this.sfx('arrow', () => this.arrow());
-          else if (e.weapon === 'ice') this.sfx('ice', () => this.ice());
-          else if (e.weapon === 'spit') this.sfx('spit', () => this.spit());
-          break;
         case 'melee': this.sfx('swing', () => this.swing()); break;
-        case 'splash': this.sfx('splash', () => this.splash()); break;
         case 'gather':
           if (e.resource === 'wood') this.sfx('chop', () => this.chop());
-          else this.sfx('mine', () => this.mine());
+          else if (e.resource === 'stone') this.sfx('mine', () => this.mine());
+          else this.sfx('coin', () => this.coin());   // berry pick — soft pluck
           break;
-        case 'explosion': this.sfx('boom', () => this.boom()); break;
-        case 'chain': this.sfx('zap', () => this.zap()); break;
-        case 'death': this.sfx('growl', () => this.growl()); break;
-        case 'coins': this.sfx('coin', () => this.coin()); break;
+        case 'pickup': this.sfx('coin', () => this.coin()); break;
+        case 'eat': this.sfx('thud', () => this.thud(180)); break;
         case 'build_placed': this.sfx('thud', () => this.thud(220)); break;
         case 'building_destroyed': this.sfx('crumble', () => this.thud(80)); break;
-        case 'wave_start': this.horn(e.boss); this.setMood(e.boss ? 'boss' : 'night'); break;
-        case 'phase_change': if (e.phase === 'day') this.setMood('day'); break;
-        case 'game_over': this.setMood(null); this.dirge(); break;
+        case 'phase_change': this.setMood(e.phase === 'day' ? 'day' : 'night'); break;
       }
     }
   }

@@ -3,9 +3,9 @@ import {
   BUILDINGS, MAP_SIZE, riverParams, inRiver, inRiverBand, onBridge, crossesBridgeRail,
   decorBlocks, type EntityId, type RiverParams, type Decor,
 } from '@lf/shared';
-import type { BuildingView, EnemyView, PlayerView, NodeView, ProjectileView } from '../net';
+import type { BuildingView, PlayerView, NodeView, GroundItemView } from '../net';
 import {
-  buildingModel, enemyModel, playerModel, treeModel, rockModel, projectileModel, toolModel,
+  buildingModel, playerModel, treeModel, rockModel, bushModel, itemModel, toolModel,
 } from './models';
 
 interface Tracked {
@@ -40,6 +40,7 @@ function dampAngle(current: number, target: number, lambda: number, dt: number):
 export class World {
   private tracked = new Map<EntityId, Tracked>();
   private nodes = new Map<EntityId, THREE.Group>();
+  private groundItems = new Map<EntityId, THREE.Group>();
   private lerpT = 1;
   private frameInterval = 0.05;   // measured server frame cadence
   private lastFrameAt = 0;
@@ -165,7 +166,7 @@ export class World {
       const hash = (n.pos.x * 73856093 ^ n.pos.y * 19349663) >>> 0;
       const g = n.kind === 'tree'
         ? treeModel(hash % 3, (hash % 100) / 100)
-        : rockModel();
+        : n.kind === 'bush' ? bushModel() : rockModel();
       g.position.set(n.pos.x + 0.5, 0, n.pos.y + 0.5);
       g.rotation.y = (n.pos.x * 7 + n.pos.y * 13) % 6.28;
       const s = 0.85 + ((hash >> 4) % 40) / 100;     // 0.85–1.25 size spread
@@ -175,53 +176,62 @@ export class World {
     }
   }
 
+  /** Reconcile ground-item meshes against the latest frame (create/move/remove). */
+  private syncGroundItems(items: GroundItemView[]): void {
+    const seen = new Set<EntityId>();
+    for (const gi of items) {
+      seen.add(gi.id);
+      let g = this.groundItems.get(gi.id);
+      if (!g) {
+        g = itemModel(gi.item);
+        g.position.set(gi.pos.x, 0, gi.pos.y);
+        this.scene.add(g);
+        this.groundItems.set(gi.id, g);
+      } else {
+        g.position.x = gi.pos.x; g.position.z = gi.pos.y;
+      }
+    }
+    for (const [id, g] of this.groundItems) {
+      if (!seen.has(id)) { this.scene.remove(g); this.groundItems.delete(id); }
+    }
+  }
+
   /** Drop all entities (used when a fresh match starts in the same session). */
   reset(): void {
     for (const t of this.tracked.values()) this.scene.remove(t.obj);
     this.tracked.clear();
     for (const g of this.nodes.values()) this.scene.remove(g);
     this.nodes.clear();
+    for (const g of this.groundItems.values()) this.scene.remove(g);
+    this.groundItems.clear();
     this.selfPredicted = null;
   }
 
   /** Called once per server frame (20 Hz). render() interpolates between frames. */
-  applyFrame(players: PlayerView[], enemies: EnemyView[], buildings: BuildingView[],
-             projectiles: ProjectileView[]): void {
+  applyFrame(players: PlayerView[], buildings: BuildingView[],
+             groundItems: GroundItemView[]): void {
     const seen = new Set<EntityId>();
 
     for (const p of players) {
       seen.add(p.id);
-      const t = this.upsert(p.id, `player:${p.klass}:${p.alive}`, p.pos.x, p.pos.y,
-        () => playerModel(p.klass), 1);   // hp shown on the nameplate, not the bar
+      const t = this.upsert(p.id, `player:${p.alive}`, p.pos.x, p.pos.y,
+        () => playerModel(), 1);   // hp shown on the nameplate, not the bar
       this.updateNameplate(t, p.id === this.selfId ? 'You' : p.name, p.hp / p.maxHp,
         p.id === this.selfId);
-    }
-    for (const pr of projectiles) {
-      seen.add(pr.id);
-      this.upsert(pr.id, `proj:${pr.kind}`, pr.pos.x, pr.pos.y,
-        () => projectileModel(pr.kind), 1);
-    }
-    for (const e of enemies) {
-      seen.add(e.id);
-      this.upsert(e.id, `enemy:${e.type}:${e.enraged}`, e.pos.x, e.pos.y,
-        () => {
-          const m = enemyModel(e.type);
-          if (e.enraged) m.scale.multiplyScalar(1.15);
-          return m;
-        }, e.hp / e.maxHp);
     }
     for (const b of buildings) {
       seen.add(b.id);
       const size = BUILDINGS[b.type].size;
-      this.upsert(b.id, `building:${b.type}:${b.tier}`,
+      this.upsert(b.id, `building:${b.type}`,
         b.pos.x + size / 2, b.pos.y + size / 2,
-        () => buildingModel(b.type, b.tier),
+        () => buildingModel(b.type, 1),
         b.hp / b.maxHp, 2.6 + size);
     }
 
     for (const [id, t] of this.tracked) {
       if (!seen.has(id)) { this.scene.remove(t.obj); this.tracked.delete(id); }
     }
+    this.syncGroundItems(groundItems);
     // adapt interpolation window to the real frame cadence (EMA, clamped)
     const now = performance.now() / 1000;
     if (this.lastFrameAt > 0) {
@@ -241,9 +251,9 @@ export class World {
   }
 
   // ---- destruction: trees topple over, rocks crumble into the ground ----
-  private dying: { obj: THREE.Group; t: number; kind: 'tree' | 'rock'; dir: number }[] = [];
+  private dying: { obj: THREE.Group; t: number; kind: 'tree' | 'rock' | 'bush'; dir: number }[] = [];
 
-  breakNode(id: EntityId, kind: 'tree' | 'rock'): void {
+  breakNode(id: EntityId, kind: 'tree' | 'rock' | 'bush'): void {
     const g = this.nodes.get(id);
     if (!g) return;
     this.nodes.delete(id);
@@ -380,7 +390,7 @@ export class World {
    * Gathering swing: the nearest player faces the node, the weapon is
    * swapped for an axe/pickaxe in the right hand, and an overhead chop plays.
    */
-  gatherSwing(x: number, y: number, resource: 'wood' | 'stone'): void {
+  gatherSwing(x: number, y: number, resource: 'wood' | 'stone' | 'berry'): void {
     let best: Tracked | null = null;
     let bd = 3.4;
     for (const [, t] of this.tracked) {
@@ -389,8 +399,8 @@ export class World {
       if (d < bd) { bd = d; best = t; }
     }
     if (!best) return;
-    best.toolKind = resource === 'wood' ? 'axe' : 'pick';
-    best.toolT = 0.55;
+    best.toolKind = resource === 'wood' ? 'axe' : resource === 'stone' ? 'pick' : null;
+    best.toolT = resource === 'berry' ? 0 : 0.55;   // berries are hand-picked
     best.attackT = 1;                       // reuse the chop arc
     best.targetHeading = Math.atan2(x - best.obj.position.x, y - best.obj.position.z);
   }
@@ -495,6 +505,14 @@ export class World {
         s.rotation.x = Math.sin(this.time * 0.8 + phase) * 0.04;
         s.rotation.z = Math.cos(this.time * 0.6 + phase) * 0.04;
       }
+    }
+
+    // ground items bob and spin
+    for (const g of this.groundItems.values()) {
+      const bob = g.userData.bob as THREE.Mesh | undefined;
+      if (!bob) continue;
+      bob.position.y = 0.3 + Math.sin(this.time * 3 + g.position.x) * 0.08;
+      bob.rotation.y += dt * 1.5;
     }
   }
 
