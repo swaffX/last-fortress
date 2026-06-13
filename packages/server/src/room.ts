@@ -210,7 +210,7 @@ export class Room {
       if (!p) continue;
       out.push({
         id: p.id, pos: p.pos, hp: p.hp, maxHp: p.maxHp, alive: p.alive, name: seat.profile.name,
-        hunger: p.hunger, hand: p.hand, region: regionAt(this.sim!.regions, p.pos).name,
+        hunger: p.hunger, temperature: p.temperature, hand: p.hand, region: regionAt(this.sim!.regions, p.pos).name,
         inventory: p.inventory, equipment: p.equipment,
       });
     }

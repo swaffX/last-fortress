@@ -20,7 +20,7 @@ export interface NodeView { id: EntityId; kind: 'tree' | 'rock' | 'bush'; pos: V
 export interface GroundItemView { id: EntityId; item: ItemId; count: number; pos: Vec2; }
 export interface PlayerView {
   id: EntityId; pos: Vec2; hp: number; maxHp: number; alive: boolean; name: string;
-  hunger: number; hand: number; region: string;
+  hunger: number; temperature: number; hand: number; region: string;
   inventory: Slot[]; equipment: { head: Slot; body: Slot; legs: Slot };
 }
 

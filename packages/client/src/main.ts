@@ -11,6 +11,7 @@ import { Hud } from './ui/hud';
 import { Screens } from './ui/screens';
 import { createInventoryUI } from './ui/inventory';
 import { createCraftUI } from './ui/craft';
+import { createCharacterUI } from './ui/character';
 import { Input } from './input';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -23,6 +24,7 @@ const screens = new Screens();
 const inventory = createInventoryUI(
   document.getElementById('hotbar-slot')!, document.getElementById('backpack-slot')!);
 const craft = createCraftUI(document.getElementById('craft-slot')!);
+const character = createCharacterUI(document.getElementById('character-slot')!);
 const input = new Input(stage, canvas);
 const net = new Net();
 
@@ -53,6 +55,9 @@ inventory.onDrop = (slot, count) => net.send({ t: 'cmd', cmd: { kind: 'drop_item
 inventory.onSelectHand = slot => net.send({ t: 'cmd', cmd: { kind: 'select_hand', slot } });
 craft.onCraft = recipeId => net.send({ t: 'cmd', cmd: { kind: 'craft', recipeId } });
 craft.onRepair = () => net.send({ t: 'cmd', cmd: { kind: 'repair_hand' } });
+character.onCraft = recipeId => net.send({ t: 'cmd', cmd: { kind: 'craft', recipeId } });
+character.onPlace = type => { input.setBuildType(type); hud.notify('Click to place · right-click to cancel'); };
+character.onRepair = () => net.send({ t: 'cmd', cmd: { kind: 'repair_hand' } });
 input.send = cmd => net.send({ t: 'cmd', cmd });
 input.ping = pos => net.send({ t: 'ping', pos });
 input.onBuildCancel = () => hud.clearBuild();
@@ -148,6 +153,7 @@ net.on((msg: ServerMsg) => {
         const nearTable = msg.buildings.some(b => b.type === 'crafting_table'
           && Math.hypot(b.pos.x + 0.5 - selfView!.pos.x, b.pos.y + 0.5 - selfView!.pos.y) <= 3.5);
         craft.setContext(selfView, nearTable);
+        character.setContext(selfView, msg.phase, msg.phaseTicks, nearTable);
       }
       break;
     }
@@ -215,6 +221,7 @@ addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'Enter') { hud.openChat(); e.preventDefault(); return; }
+  if (e.key === 'Tab') { e.preventDefault(); character.toggle(); return; }
   if (e.target instanceof HTMLInputElement) return;
   const k = e.key.toLowerCase();
   if (k === 'e') {
@@ -224,10 +231,10 @@ addEventListener('keydown', e => {
   }
   if (k === 'i') inventory.toggle();
   if (k === 'c') craft.toggle();
-  if (k === 'b') hud.toggleBuildMenu();
+  if (k === 'b') character.toggle();
   if (k === 'q') net.send({ t: 'cmd', cmd: { kind: 'eat' } });   // quick-eat
   if (e.key >= '1' && e.key <= '9') net.send({ t: 'cmd', cmd: { kind: 'select_hand', slot: Number(e.key) - 1 } });
-  if (e.key === 'Escape') { hud.clearBuild(); hud.selectBuilding(null); hud.toggleBuildMenu(false); inventory.toggle(false); craft.toggle(false); }
+  if (e.key === 'Escape') { hud.clearBuild(); hud.selectBuilding(null); hud.toggleBuildMenu(false); inventory.toggle(false); craft.toggle(false); character.toggle(false); }
   if (k === 'k' && profile) screens.skillTree(profile, true);
 });
 
