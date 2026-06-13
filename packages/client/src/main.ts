@@ -1,6 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
-import { riverParams, generateDecor, CREATURES } from '@lf/shared';
+import { riverParams, generateDecor, CREATURES, BUILDINGS } from '@lf/shared';
 import { Net, type ServerMsg, type ProfileView, type BuildingView, type NodeView, type PlayerView } from './net';
 import { Stage } from './render/scene';
 import { World } from './render/world';
@@ -31,6 +31,17 @@ let profile: ProfileView | null = null;
 let env: Environment | null = null;
 let inGame = false;
 let lastFrameBuildings: BuildingView[] = [];
+
+// Tolerate client/server version skew: a stale cached bundle won't know a building
+// type a newer server sends, and an unguarded BUILDINGS[type] lookup would crash the
+// render + input loop every frame. Drop unknown types and warn once instead.
+const warnedBuildingTypes = new Set<string>();
+function warnUnknownBuilding(type: string): void {
+  if (warnedBuildingTypes.has(type)) return;
+  warnedBuildingTypes.add(type);
+  console.warn(`[lf] server sent unknown building type "${type}" — this client bundle is ` +
+    `stale. Hard-reload (Ctrl+Shift+R) to update.`);
+}
 let lastNodes: NodeView[] = [];
 let selfId = -1;
 let selfView: PlayerView | undefined;
@@ -117,10 +128,15 @@ net.on((msg: ServerMsg) => {
       audio.setPhase('day');
       break;
     case 'frame': {
-      lastFrameBuildings = msg.buildings;
-      input.buildings = msg.buildings;
-      world.colliders = { buildings: msg.buildings, nodes: lastNodes };
-      world.applyFrame(msg.players, msg.buildings, msg.groundItems, msg.creatures, msg.projectiles);
+      const buildings = msg.buildings.filter(b => {
+        if (BUILDINGS[b.type]) return true;
+        warnUnknownBuilding(b.type);
+        return false;
+      });
+      lastFrameBuildings = buildings;
+      input.buildings = buildings;
+      world.colliders = { buildings, nodes: lastNodes };
+      world.applyFrame(msg.players, buildings, msg.groundItems, msg.creatures, msg.projectiles);
       selfView = msg.players.find(p => p.id === selfId);
       for (const e of msg.events) {
         if (e.kind === 'melee') world.lungePlayerAt(e.pos.x, e.pos.y);
@@ -158,7 +174,7 @@ net.on((msg: ServerMsg) => {
       audio.setPhase(msg.phase);
       stage.setNight(msg.phase === 'night');
       stage.setGameTick(msg.tick);
-      hud.updateFrame(selfView, msg.players, msg.buildings, msg.phase, msg.phaseTicks, selfId);
+      hud.updateFrame(selfView, msg.players, buildings, msg.phase, msg.phaseTicks, selfId);
       hud.handleEvents(msg.events, project);
       // threat + boss readout from nearby creatures
       if (selfView) {
@@ -178,7 +194,7 @@ net.on((msg: ServerMsg) => {
       }
       if (selfView) {
         inventory.setData(selfView.inventory, selfView.equipment, selfView.hand);
-        const nearTable = msg.buildings.some(b => b.type === 'crafting_table'
+        const nearTable = buildings.some(b => b.type === 'crafting_table'
           && Math.hypot(b.pos.x + 0.5 - selfView!.pos.x, b.pos.y + 0.5 - selfView!.pos.y) <= 3.5);
         character.setContext(selfView, msg.phase, msg.phaseTicks, nearTable);
       }

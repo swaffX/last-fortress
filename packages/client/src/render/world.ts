@@ -215,7 +215,7 @@ export class World {
 
   /** Called once per server frame (20 Hz). render() interpolates between frames. */
   applyFrame(players: PlayerView[], buildings: BuildingView[],
-             groundItems: GroundItemView[], creatures: CreatureView[] = [],
+             groundItems: GroundItemView[] = [], creatures: CreatureView[] = [],
              projectiles: ProjectileView[] = []): void {
     const seen = new Set<EntityId>();
 
