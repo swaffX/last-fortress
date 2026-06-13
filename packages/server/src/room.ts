@@ -5,7 +5,7 @@ import {
 } from '@lf/shared';
 import {
   encode, type ServerMsg, type BuildingView, type PlayerView,
-  type NodeView, type GroundItemView,
+  type NodeView, type GroundItemView, type CreatureView, type ProjectileView,
 } from './protocol';
 import type { Profile, ProfileStore } from './db';
 import type { WorldStore, WorldRecord } from './world-store';
@@ -199,7 +199,8 @@ export class Room {
     return {
       t: 'frame', tick: s.tick, phase: s.phase, phaseTicks: s.phaseTicks,
       players: this.playerViews(), buildings: this.buildingViews(),
-      groundItems: this.groundItemViews(), events,
+      groundItems: this.groundItemViews(), creatures: this.creatureViews(),
+      projectiles: this.projectileViews(), events,
     };
   }
   private playerViews(): PlayerView[] {
@@ -225,6 +226,14 @@ export class Room {
     return [...this.sim!.state.groundItems.values()].map(g => ({
       id: g.id, item: g.item, count: g.count, pos: g.pos,
     }));
+  }
+  private creatureViews(): CreatureView[] {
+    return [...this.sim!.state.creatures.values()].map(c => ({
+      id: c.id, species: c.species, pos: c.pos, hp: c.hp, maxHp: c.maxHp,
+    }));
+  }
+  private projectileViews(): ProjectileView[] {
+    return [...this.sim!.state.projectiles.values()].map(p => ({ id: p.id, kind: p.kind, pos: p.pos }));
   }
   private nodeViews(): NodeView[] {
     return [...this.sim!.state.nodes.values()].map(n => ({ id: n.id, kind: n.kind, pos: n.pos, amount: n.amount }));
@@ -260,6 +269,7 @@ function validCommand(cmd: Command): boolean {
     case 'drop_item': return Number.isInteger(cmd.slot) && Number.isInteger(cmd.count) && cmd.count > 0;
     case 'craft': return typeof cmd.recipeId === 'string';
     case 'repair_hand': return true;
+    case 'attack': return isFiniteVec(cmd.dir);
     case 'build': return typeof cmd.type === 'string' && cmd.type in BUILDINGS && isFiniteVec(cmd.pos);
     case 'demolish': return Number.isInteger(cmd.buildingId);
     default: return false;

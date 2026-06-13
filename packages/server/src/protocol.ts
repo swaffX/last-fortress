@@ -18,6 +18,8 @@ export type ClientMsg =
 export interface BuildingView { id: EntityId; type: BuildingType; pos: Vec2; hp: number; maxHp: number; }
 export interface NodeView { id: EntityId; kind: 'tree' | 'rock' | 'bush'; pos: Vec2; amount: number; }
 export interface GroundItemView { id: EntityId; item: ItemId; count: number; pos: Vec2; }
+export interface CreatureView { id: EntityId; species: string; pos: Vec2; hp: number; maxHp: number; }
+export interface ProjectileView { id: EntityId; kind: 'spit' | 'bolt'; pos: Vec2; }
 export interface PlayerView {
   id: EntityId; pos: Vec2; hp: number; maxHp: number; alive: boolean; name: string;
   hunger: number; temperature: number; hand: number; region: string;
@@ -30,7 +32,8 @@ export type ServerMsg =
   | { t: 'game_start'; seed: number; selfId: EntityId; nodes: NodeView[]; buildings: BuildingView[] }
   | { t: 'frame'; tick: number; phase: Phase; phaseTicks: number;
       players: PlayerView[]; buildings: BuildingView[];
-      groundItems: GroundItemView[]; events: SimEvent[] }
+      groundItems: GroundItemView[]; creatures: CreatureView[]; projectiles: ProjectileView[];
+      events: SimEvent[] }
   | { t: 'ping'; pos: Vec2; from: string }
   | { t: 'profile'; profile: ProfileView }
   | { t: 'lobby_closed' }
