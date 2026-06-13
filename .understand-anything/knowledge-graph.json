@@ -1,0 +1,4318 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "last-fortress",
+    "languages": [
+      "caddyfile",
+      "css",
+      "dockerfile",
+      "example",
+      "html",
+      "javascript",
+      "json",
+      "markdown",
+      "typescript",
+      "yaml"
+    ],
+    "frameworks": [
+      "Docker",
+      "Docker Compose",
+      "PostgreSQL (pg)",
+      "Three.js",
+      "TypeScript",
+      "Vite",
+      "Vitest",
+      "WebSocket (ws)"
+    ],
+    "description": "Browser-based multiplayer co-op survival tower defense game. Defend the castle against endless zombie waves by gathering resources during the day and building/upgrading defenses for nighttime survival. Supports solo or 2-player co-op via party codes.",
+    "analyzedAt": "2026-06-13T14:17:26.613Z",
+    "gitCommitHash": "3665f7fbd422ea7539e528635a20bf55cc7d3466"
+  },
+  "nodes": [
+    {
+      "id": "file:.env.example",
+      "type": "file",
+      "name": ".env.example",
+      "filePath": ".env.example",
+      "summary": "Environment variable template for Docker deployment, defining database password and JWT token secret configuration.",
+      "tags": [
+        "configuration",
+        "deployment",
+        "secrets"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:Caddyfile",
+      "type": "config",
+      "name": "Caddyfile",
+      "filePath": "Caddyfile",
+      "summary": "Reverse proxy configuration for TLS termination and WebSocket routing, automatically provisioning Let's Encrypt certificates and proxying traffic to the game server.",
+      "tags": [
+        "infrastructure",
+        "deployment",
+        "tls",
+        "reverse-proxy"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:CLAUDE.md",
+      "type": "document",
+      "name": "CLAUDE.md",
+      "filePath": "CLAUDE.md",
+      "summary": "Project development guidelines documenting model delegation strategy, original thinking mandate, design and frontend requirements, development workflow, and token efficiency practices.",
+      "tags": [
+        "documentation",
+        "development-guide",
+        "project-rules"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:docker-compose.yml",
+      "type": "config",
+      "name": "docker-compose.yml",
+      "filePath": "docker-compose.yml",
+      "summary": "Orchestration configuration deploying the game server (Node.js) and PostgreSQL database with health checks, environment variables, and persistent volume management.",
+      "tags": [
+        "infrastructure",
+        "orchestration",
+        "database",
+        "deployment"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "service:Dockerfile",
+      "type": "service",
+      "name": "Dockerfile",
+      "filePath": "Dockerfile",
+      "summary": "Multi-stage Docker build producing a minimal Node.js production image: build stage compiles client and dependencies, runtime stage copies optimized artifacts and runs the server entry point.",
+      "tags": [
+        "containerization",
+        "infrastructure",
+        "deployment",
+        "build-system"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Multi-stage build separates build dependencies from runtime, reducing final image size by omitting dev dependencies and source maps in production."
+    },
+    {
+      "id": "document:docs/superpowers/plans/2026-06-12-phase1-sim-core.md",
+      "type": "document",
+      "name": "2026-06-12-phase1-sim-core.md",
+      "filePath": "docs/superpowers/plans/2026-06-12-phase1-sim-core.md",
+      "summary": "Detailed implementation plan for Phase 1 game simulation core, covering architecture, tick loop, component system, entity managers, and development milestone breakdown.",
+      "tags": [
+        "documentation",
+        "planning",
+        "architecture",
+        "game-simulation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:docs/superpowers/plans/2026-06-13-phase0-survival-core.md",
+      "type": "document",
+      "name": "2026-06-13-phase0-survival-core.md",
+      "filePath": "docs/superpowers/plans/2026-06-13-phase0-survival-core.md",
+      "summary": "Implementation plan for Phase 0 survival core conversion, detailing inventory system, hunger/health mechanics, persistent world, 4-player co-op, and death/respawn systems with technical breakdown.",
+      "tags": [
+        "documentation",
+        "planning",
+        "architecture",
+        "survival-mechanics"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:docs/superpowers/plans/2026-06-13-phase1-crafting.md",
+      "type": "document",
+      "name": "2026-06-13-phase1-crafting.md",
+      "filePath": "docs/superpowers/plans/2026-06-13-phase1-crafting.md",
+      "summary": "Implementation plan for Phase 1 crafting system, covering recipe graph structure, crafting table mechanics, material-tiered tools and weapons, and UI/UX integration.",
+      "tags": [
+        "documentation",
+        "planning",
+        "crafting-system",
+        "architecture"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:docs/superpowers/specs/2026-06-12-last-fortress-design.md",
+      "type": "document",
+      "name": "2026-06-12-last-fortress-design.md",
+      "filePath": "docs/superpowers/specs/2026-06-12-last-fortress-design.md",
+      "summary": "Complete Phase 1 design specification for Last Fortress tower defense game, documenting core mechanics, architecture (monorepo shared/server/client), deployment, and testing strategy.",
+      "tags": [
+        "documentation",
+        "specification",
+        "design",
+        "architecture"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:docs/superpowers/specs/2026-06-13-phase1-crafting-design.md",
+      "type": "document",
+      "name": "2026-06-13-phase1-crafting-design.md",
+      "filePath": "docs/superpowers/specs/2026-06-13-phase1-crafting-design.md",
+      "summary": "Design specification for Phase 1 crafting system, defining recipe structure, tool/weapon tiers, inventory UI, and integration with the survival mechanics and game balance.",
+      "tags": [
+        "documentation",
+        "specification",
+        "crafting-design"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:docs/superpowers/specs/2026-06-13-survival-conversion-design.md",
+      "type": "document",
+      "name": "2026-06-13-survival-conversion-design.md",
+      "filePath": "docs/superpowers/specs/2026-06-13-survival-conversion-design.md",
+      "summary": "Umbrella design document for converting Last Fortress from wave-defense tower defense to persistent open-world survival sandbox, documenting locked architectural decisions and full phase decomposition (Phase 0–6).",
+      "tags": [
+        "documentation",
+        "specification",
+        "architecture",
+        "conversion-design"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "package.json",
+      "summary": "Root monorepo workspace configuration using npm workspaces, defining test and typecheck scripts that run across all packages.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "monorepo"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/client/index.html",
+      "type": "file",
+      "name": "index.html",
+      "filePath": "packages/client/index.html",
+      "summary": "HTML entry point for the client application, loading custom fonts, setting up canvas and HUD containers, and bootstrapping the TypeScript main module.",
+      "tags": [
+        "entry-point",
+        "markup",
+        "ui-framework"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/client/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "packages/client/package.json",
+      "summary": "Client package configuration with Vite dev/build scripts, dependencies on Three.js and shared game simulation, and TypeScript tooling.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "dependencies"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/client/tsconfig.json",
+      "type": "config",
+      "name": "tsconfig.json",
+      "filePath": "packages/client/tsconfig.json",
+      "summary": "TypeScript configuration for client package, extending base config and adding DOM library definitions for browser environment.",
+      "tags": [
+        "configuration",
+        "typescript",
+        "build-system"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/client/vite.config.ts",
+      "type": "file",
+      "name": "vite.config.ts",
+      "filePath": "packages/client/vite.config.ts",
+      "summary": "Vite build configuration for the client, setting up WebSocket proxy to server for development and enabling source maps for production.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "development"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/client/style.css",
+      "type": "file",
+      "name": "style.css",
+      "filePath": "packages/client/style.css",
+      "summary": "Global stylesheet for the game HUD and UI components, defining layout, typography, colors, animations, and responsive design for overlay elements.",
+      "tags": [
+        "styling",
+        "ui",
+        "design-system"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/server/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "packages/server/package.json",
+      "summary": "Server package configuration with dev/start scripts, dependencies on WebSocket server (ws), PostgreSQL client (pg), and shared game simulation.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "dependencies"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/server/tsconfig.json",
+      "type": "config",
+      "name": "tsconfig.json",
+      "filePath": "packages/server/tsconfig.json",
+      "summary": "TypeScript configuration for server package, extending base config and adding Node.js type definitions.",
+      "tags": [
+        "configuration",
+        "typescript",
+        "build-system"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/shared/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "packages/shared/package.json",
+      "summary": "Shared package configuration for deterministic game simulation, with test and typecheck scripts and no runtime dependencies.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "game-simulation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/shared/tsconfig.json",
+      "type": "config",
+      "name": "tsconfig.json",
+      "filePath": "packages/shared/tsconfig.json",
+      "summary": "TypeScript configuration for shared game simulation package, extending base config and including test files.",
+      "tags": [
+        "configuration",
+        "typescript",
+        "build-system"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:prompt.md",
+      "type": "document",
+      "name": "prompt.md",
+      "filePath": "prompt.md",
+      "summary": "Original project vision and requirements document for Last Fortress, detailing core gameplay mechanics, camera system, map design, day/night system, and strategic inspiration from games like Zombs.io and Kingdom Rush.",
+      "tags": [
+        "documentation",
+        "requirements",
+        "specification",
+        "vision"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "Project overview and quick-start guide, documenting the monorepo architecture, development setup, production deployment via Docker, game controls, and verification commands.",
+      "tags": [
+        "documentation",
+        "entry-point",
+        "getting-started",
+        "overview"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:tsconfig.base.json",
+      "type": "config",
+      "name": "tsconfig.base.json",
+      "filePath": "tsconfig.base.json",
+      "summary": "Base TypeScript configuration shared by all packages, enabling strict mode, declaration generation, and source maps with ES2022 target and bundler module resolution.",
+      "tags": [
+        "configuration",
+        "typescript",
+        "build-system"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/src/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/shared/src/index.ts",
+      "summary": "Public barrel export of the shared simulation package, re-exporting core game loop, data definitions, and utility functions for both server and client consumption.",
+      "tags": [
+        "entry-point",
+        "barrel",
+        "exports",
+        "tested"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/src/sim/combat.ts",
+      "type": "file",
+      "name": "combat.ts",
+      "filePath": "packages/shared/src/sim/combat.ts",
+      "summary": "Provides distance calculation and building center position utilities for collision detection and range queries in combat and placement systems.",
+      "tags": [
+        "utility",
+        "math",
+        "collision"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/combat.ts:dist",
+      "type": "function",
+      "name": "dist",
+      "filePath": "packages/shared/src/sim/combat.ts",
+      "lineRange": [
+        3,
+        5
+      ],
+      "summary": "Calculates Euclidean distance between two 2D points for range and proximity checks.",
+      "tags": [
+        "utility",
+        "math",
+        "distance"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/combat.ts:buildingCenter",
+      "type": "function",
+      "name": "buildingCenter",
+      "filePath": "packages/shared/src/sim/combat.ts",
+      "lineRange": [
+        7,
+        9
+      ],
+      "summary": "Returns the center point of a building footprint given its top-left position and size.",
+      "tags": [
+        "utility",
+        "geometry",
+        "building"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/src/sim/constants.ts",
+      "type": "file",
+      "name": "constants.ts",
+      "filePath": "packages/shared/src/sim/constants.ts",
+      "summary": "Centralized game balance constants defining tick rates, day/night cycles, player movement speed, inventory layout, hunger mechanics, gathering rates, and item respawn times.",
+      "tags": [
+        "configuration",
+        "constants",
+        "game-balance"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Constants exported as const, enabling TypeScript tree-shaking and compile-time optimizations for performance-critical values."
+    },
+    {
+      "id": "file:packages/shared/src/sim/data/buildings.ts",
+      "type": "file",
+      "name": "buildings.ts",
+      "filePath": "packages/shared/src/sim/data/buildings.ts",
+      "summary": "Defines building types (walls, gates, spikes, crafting table) with properties like size, walkability, health points, and resource costs for construction.",
+      "tags": [
+        "data-definition",
+        "building-registry",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/src/sim/data/items.ts",
+      "type": "file",
+      "name": "items.ts",
+      "filePath": "packages/shared/src/sim/data/items.ts",
+      "summary": "Defines all items in the game (resources, tools, weapons, food) with properties including stack sizes, durability, gather multipliers, and repair mechanics.",
+      "tags": [
+        "data-definition",
+        "item-registry",
+        "inventory"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/shared/src/sim/data/items.ts:isDurable",
+      "type": "function",
+      "name": "isDurable",
+      "filePath": "packages/shared/src/sim/data/items.ts",
+      "lineRange": [
+        56,
+        58
+      ],
+      "summary": "Tests whether an item has per-instance durability and cannot be stacked with others.",
+      "tags": [
+        "utility",
+        "inventory",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/src/sim/data/recipes.ts",
+      "type": "file",
+      "name": "recipes.ts",
+      "filePath": "packages/shared/src/sim/data/recipes.ts",
+      "summary": "Defines all craftable recipes with input requirements, output items, crafting table requirements, and wiki-style descriptions for player guidance.",
+      "tags": [
+        "data-definition",
+        "recipe-registry",
+        "crafting"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/data/recipes.ts:recipeById",
+      "type": "function",
+      "name": "recipeById",
+      "filePath": "packages/shared/src/sim/data/recipes.ts",
+      "lineRange": [
+        42,
+        44
+      ],
+      "summary": "Looks up a recipe definition by ID for use in crafting validation and execution.",
+      "tags": [
+        "utility",
+        "lookup",
+        "crafting"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/src/sim/data/skills.ts",
+      "type": "file",
+      "name": "skills.ts",
+      "filePath": "packages/shared/src/sim/data/skills.ts",
+      "summary": "Defines skill tree with three branches (combat, engineering, economy) and their modifier effects on damage, range, build costs, and income.",
+      "tags": [
+        "data-definition",
+        "skill-registry",
+        "progression"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/shared/src/sim/data/skills.ts:defaultModifiers",
+      "type": "function",
+      "name": "defaultModifiers",
+      "filePath": "packages/shared/src/sim/data/skills.ts",
+      "lineRange": [
+        15,
+        21
+      ],
+      "summary": "Creates a fresh skill modifier object with all multipliers initialized to neutral (1.0) and probabilities to zero.",
+      "tags": [
+        "utility",
+        "initialization",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/data/skills.ts:applySkills",
+      "type": "function",
+      "name": "applySkills",
+      "filePath": "packages/shared/src/sim/data/skills.ts",
+      "lineRange": [
+        49,
+        53
+      ],
+      "summary": "Applies a set of unlocked skill modifiers by accumulating their effects on damage, range, cost, and income multipliers.",
+      "tags": [
+        "calculation",
+        "progression",
+        "modifiers"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/src/sim/decor.ts",
+      "type": "file",
+      "name": "decor.ts",
+      "filePath": "packages/shared/src/sim/decor.ts",
+      "summary": "Generates procedural map decorations (houses, ruins, towers, etc.) with collision radii based on Voronoi regions, avoiding nodes and map boundaries.",
+      "tags": [
+        "map-generation",
+        "procedural",
+        "collision"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/shared/src/sim/decor.ts:generateDecor",
+      "type": "function",
+      "name": "generateDecor",
+      "filePath": "packages/shared/src/sim/decor.ts",
+      "lineRange": [
+        23,
+        60
+      ],
+      "summary": "Procedurally generates map decorations (houses, ruins, cemeteries, watchtowers, windmills, swamps) using seeded RNG with collision avoidance.",
+      "tags": [
+        "map-generation",
+        "procedural",
+        "rng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/shared/src/sim/decor.ts:decorBlocks",
+      "type": "function",
+      "name": "decorBlocks",
+      "filePath": "packages/shared/src/sim/decor.ts",
+      "lineRange": [
+        63,
+        68
+      ],
+      "summary": "Tests whether a position collides with any solid decoration (non-zero radius) for movement and placement validation.",
+      "tags": [
+        "collision",
+        "validation",
+        "movement"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/src/sim/grid.ts",
+      "type": "file",
+      "name": "grid.ts",
+      "filePath": "packages/shared/src/sim/grid.ts",
+      "summary": "Implements spatial occupancy grid for collision detection, tracking which entities occupy grid cells for buildings, nodes, and players.",
+      "tags": [
+        "data-structure",
+        "collision",
+        "spatial"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:packages/shared/src/sim/grid.ts:Grid",
+      "type": "class",
+      "name": "Grid",
+      "filePath": "packages/shared/src/sim/grid.ts",
+      "lineRange": [
+        4,
+        37
+      ],
+      "summary": "Fixed-size 2D occupancy grid using Int32Array for O(1) collision checks and footprint validation.",
+      "tags": [
+        "data-structure",
+        "collision",
+        "spatial"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/shared/src/sim/inventory.ts",
+      "type": "file",
+      "name": "inventory.ts",
+      "filePath": "packages/shared/src/sim/inventory.ts",
+      "summary": "Inventory management system supporting item stacking, durability tracking, slot manipulation, and drag-and-drop behavior for player and ground items.",
+      "tags": [
+        "inventory",
+        "item-management",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/shared/src/sim/inventory.ts:addItem",
+      "type": "function",
+      "name": "addItem",
+      "filePath": "packages/shared/src/sim/inventory.ts",
+      "lineRange": [
+        4,
+        23
+      ],
+      "summary": "Attempts to add a quantity of stackable items to inventory, filling existing stacks first then empty slots, returning leftover items.",
+      "tags": [
+        "inventory",
+        "stacking",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/inventory.ts:removeItem",
+      "type": "function",
+      "name": "removeItem",
+      "filePath": "packages/shared/src/sim/inventory.ts",
+      "lineRange": [
+        26,
+        37
+      ],
+      "summary": "Removes a quantity of items from inventory across multiple stacks, clearing empty slots and ensuring sufficient quantity exists.",
+      "tags": [
+        "inventory",
+        "consumption",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/inventory.ts:countItem",
+      "type": "function",
+      "name": "countItem",
+      "filePath": "packages/shared/src/sim/inventory.ts",
+      "lineRange": [
+        39,
+        43
+      ],
+      "summary": "Counts the total quantity of a specific item across all inventory slots.",
+      "tags": [
+        "inventory",
+        "query",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/inventory.ts:firstEmpty",
+      "type": "function",
+      "name": "firstEmpty",
+      "filePath": "packages/shared/src/sim/inventory.ts",
+      "lineRange": [
+        45,
+        47
+      ],
+      "summary": "Returns the index of the first empty inventory slot, or -1 if full.",
+      "tags": [
+        "inventory",
+        "query",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/inventory.ts:moveSlot",
+      "type": "function",
+      "name": "moveSlot",
+      "filePath": "packages/shared/src/sim/inventory.ts",
+      "lineRange": [
+        50,
+        63
+      ],
+      "summary": "Implements drag-and-drop slot movement with merging of identical stackable items or swapping of disparate stacks.",
+      "tags": [
+        "inventory",
+        "interaction",
+        "ui-logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/shared/src/sim/inventory.ts:emptyInventory",
+      "type": "function",
+      "name": "emptyInventory",
+      "filePath": "packages/shared/src/sim/inventory.ts",
+      "lineRange": [
+        65,
+        67
+      ],
+      "summary": "Creates a new empty inventory array of specified size filled with null slots.",
+      "tags": [
+        "inventory",
+        "initialization",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/inventory.ts:giveItem",
+      "type": "function",
+      "name": "giveItem",
+      "filePath": "packages/shared/src/sim/inventory.ts",
+      "lineRange": [
+        73,
+        81
+      ],
+      "summary": "Places items in inventory, respecting durability constraints (one durable item per slot) and returning leftover items.",
+      "tags": [
+        "inventory",
+        "placement",
+        "durability"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/src/sim/mapgen.ts",
+      "type": "file",
+      "name": "mapgen.ts",
+      "filePath": "packages/shared/src/sim/mapgen.ts",
+      "summary": "Procedurally generates resource nodes (trees, rocks, bushes) across the map using biome-based density distributions, avoiding camp clearing and river areas.",
+      "tags": [
+        "map-generation",
+        "procedural",
+        "resources"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/shared/src/sim/mapgen.ts:generateMap",
+      "type": "function",
+      "name": "generateMap",
+      "filePath": "packages/shared/src/sim/mapgen.ts",
+      "lineRange": [
+        22,
+        48
+      ],
+      "summary": "Generates procedural map with resource nodes placed in clusters, respecting biome densities and avoiding restricted zones (camp, river).",
+      "tags": [
+        "map-generation",
+        "procedural",
+        "rng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/shared/src/sim/regions.ts",
+      "type": "file",
+      "name": "regions.ts",
+      "filePath": "packages/shared/src/sim/regions.ts",
+      "summary": "Implements Voronoi biome partition system with 9 named regions (meadow at center, 8 others) and nearest-site region lookup for terrain and resource distribution.",
+      "tags": [
+        "map-generation",
+        "biome",
+        "procedural"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/shared/src/sim/regions.ts:generateRegions",
+      "type": "function",
+      "name": "generateRegions",
+      "filePath": "packages/shared/src/sim/regions.ts",
+      "lineRange": [
+        30,
+        58
+      ],
+      "summary": "Generates Voronoi-based biome regions with the camp at meadow center and 8 satellite regions seeded by RNG.",
+      "tags": [
+        "map-generation",
+        "procedural",
+        "rng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/shared/src/sim/regions.ts:regionAt",
+      "type": "function",
+      "name": "regionAt",
+      "filePath": "packages/shared/src/sim/regions.ts",
+      "lineRange": [
+        61,
+        68
+      ],
+      "summary": "Determines which region contains a position by finding the nearest Voronoi site.",
+      "tags": [
+        "query",
+        "spatial",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/src/sim/river.ts",
+      "type": "file",
+      "name": "river.ts",
+      "filePath": "packages/shared/src/sim/river.ts",
+      "summary": "Defines river system with sinusoidal wave generation, bridge crossing points, and collision/slowdown logic shared between server movement and client rendering.",
+      "tags": [
+        "map-feature",
+        "procedural",
+        "collision"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/shared/src/sim/river.ts:riverParams",
+      "type": "function",
+      "name": "riverParams",
+      "filePath": "packages/shared/src/sim/river.ts",
+      "lineRange": [
+        23,
+        32
+      ],
+      "summary": "Generates deterministic river parameters (offset, amplitude, frequency, phase) from seed for map-wide consistency.",
+      "tags": [
+        "procedural",
+        "rng",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/river.ts:riverYAt",
+      "type": "function",
+      "name": "riverYAt",
+      "filePath": "packages/shared/src/sim/river.ts",
+      "lineRange": [
+        34,
+        36
+      ],
+      "summary": "Computes Y coordinate of the river centerline at a given X using sine wave function.",
+      "tags": [
+        "utility",
+        "math",
+        "river"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/river.ts:onBridge",
+      "type": "function",
+      "name": "onBridge",
+      "filePath": "packages/shared/src/sim/river.ts",
+      "lineRange": [
+        38,
+        40
+      ],
+      "summary": "Tests if a position is on one of the two bridge crossings (no slowdown when true).",
+      "tags": [
+        "collision",
+        "validation",
+        "river"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/river.ts:inRiver",
+      "type": "function",
+      "name": "inRiver",
+      "filePath": "packages/shared/src/sim/river.ts",
+      "lineRange": [
+        43,
+        46
+      ],
+      "summary": "Tests if a position is in the water channel and not on a bridge for movement slowdown.",
+      "tags": [
+        "collision",
+        "movement",
+        "river"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/river.ts:inRiverBand",
+      "type": "function",
+      "name": "inRiverBand",
+      "filePath": "packages/shared/src/sim/river.ts",
+      "lineRange": [
+        49,
+        51
+      ],
+      "summary": "Tests if a position is within river band margin (ignoring bridges) for terrain exclusion zones.",
+      "tags": [
+        "collision",
+        "terrain",
+        "river"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/river.ts:crossesBridgeRail",
+      "type": "function",
+      "name": "crossesBridgeRail",
+      "filePath": "packages/shared/src/sim/river.ts",
+      "lineRange": [
+        58,
+        67
+      ],
+      "summary": "Detects when a movement segment crosses a bridge edge (preventing entry/exit except at ends).",
+      "tags": [
+        "collision",
+        "movement",
+        "river"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/shared/src/sim/rng.ts",
+      "type": "file",
+      "name": "rng.ts",
+      "filePath": "packages/shared/src/sim/rng.ts",
+      "summary": "Seeded pseudorandom number generator using xorshift-based algorithm for deterministic procedural map and decor generation.",
+      "tags": [
+        "utility",
+        "rng",
+        "procedural",
+        "tested"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:packages/shared/src/sim/rng.ts:Rng",
+      "type": "class",
+      "name": "Rng",
+      "filePath": "packages/shared/src/sim/rng.ts",
+      "lineRange": [
+        1,
+        19
+      ],
+      "summary": "Seeded xorshift RNG with methods for float [0,1), integer range, and array picking.",
+      "tags": [
+        "utility",
+        "rng",
+        "procedural"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/src/sim/types.ts",
+      "type": "file",
+      "name": "types.ts",
+      "filePath": "packages/shared/src/sim/types.ts",
+      "summary": "Defines core game entity and state types: Player, Building, ResourceNode, DroppedItem, command/event unions, and game phase enumerations.",
+      "tags": [
+        "type-definition",
+        "schema",
+        "core-types"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/shared/src/sim/sim.ts",
+      "type": "file",
+      "name": "sim.ts",
+      "filePath": "packages/shared/src/sim/sim.ts",
+      "summary": "Main game simulation loop orchestrating world state, handling player commands (movement, gathering, crafting, building), and emitting game events for synchronization.",
+      "tags": [
+        "entry-point",
+        "simulation",
+        "game-loop"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:packages/shared/src/sim/sim.ts:Sim",
+      "type": "class",
+      "name": "Sim",
+      "filePath": "packages/shared/src/sim/sim.ts",
+      "lineRange": [
+        35,
+        443
+      ],
+      "summary": "Central simulation engine managing world state, player inputs, and event generation. Orchestrates collision detection, gathering, crafting, building, hunger, respawns, and region tracking.",
+      "tags": [
+        "simulation",
+        "game-loop",
+        "orchestration"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/shared/src/sim/snapshot.ts",
+      "type": "file",
+      "name": "snapshot.ts",
+      "filePath": "packages/shared/src/sim/snapshot.ts",
+      "summary": "Serialization utilities for saving and loading game state, converting mutable Maps to JSON-serializable arrays and back for persistence.",
+      "tags": [
+        "serialization",
+        "persistence",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/snapshot.ts:serializeState",
+      "type": "function",
+      "name": "serializeState",
+      "filePath": "packages/shared/src/sim/snapshot.ts",
+      "lineRange": [
+        3,
+        11
+      ],
+      "summary": "Converts SimState with Map collections to JSON string for persistence storage.",
+      "tags": [
+        "serialization",
+        "persistence",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/shared/src/sim/snapshot.ts:deserializeState",
+      "type": "function",
+      "name": "deserializeState",
+      "filePath": "packages/shared/src/sim/snapshot.ts",
+      "lineRange": [
+        13,
+        22
+      ],
+      "summary": "Reconstructs SimState from JSON string, converting serialized arrays back to Map collections.",
+      "tags": [
+        "deserialization",
+        "persistence",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/test/rng.test.ts",
+      "type": "file",
+      "name": "rng.test.ts",
+      "filePath": "packages/shared/test/rng.test.ts",
+      "summary": "Unit tests verifying RNG determinism, output range [0,1), and inclusive integer range generation.",
+      "tags": [
+        "test",
+        "unit-test",
+        "rng"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/test/smoke.test.ts",
+      "type": "file",
+      "name": "smoke.test.ts",
+      "filePath": "packages/shared/test/smoke.test.ts",
+      "summary": "Smoke test verifying the shared package exports and version constant are correctly resolved.",
+      "tags": [
+        "test",
+        "smoke-test",
+        "integration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/shared/vitest.config.ts",
+      "type": "file",
+      "name": "vitest.config.ts",
+      "filePath": "packages/shared/vitest.config.ts",
+      "summary": "Vitest configuration specifying test file pattern for the shared package test suite.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "test"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/server/src/auth.ts",
+      "type": "file",
+      "name": "auth.ts",
+      "filePath": "packages/server/src/auth.ts",
+      "summary": "Anonymous device authentication using HMAC-signed tokens for stateless player identity. Provides token issuance and verification without storing passwords or personally identifiable information.",
+      "tags": [
+        "authentication",
+        "security",
+        "token",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/server/src/db.ts",
+      "type": "file",
+      "name": "db.ts",
+      "filePath": "packages/server/src/db.ts",
+      "summary": "Persistence layer supporting both PostgreSQL production deployments and in-memory development mode. Manages player profiles with skill progression, statistics, and server-side skill unlock validation.",
+      "tags": [
+        "database",
+        "persistence",
+        "profile-management",
+        "storage"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/server/src/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/server/src/index.ts",
+      "summary": "Main server entry point bootstrapping HTTP server, WebSocket listener, and game session management. Handles client connections, message routing, authentication flow, and lobby/game command dispatch.",
+      "tags": [
+        "entry-point",
+        "server",
+        "websocket",
+        "game-server"
+      ],
+      "complexity": "complex",
+      "languageNotes": "TypeScript server orchestrating multiple subsystems: static file serving, WebSocket protocol handling, session state management, and command routing through a single message dispatcher."
+    },
+    {
+      "id": "file:packages/server/src/lobby.ts",
+      "type": "file",
+      "name": "lobby.ts",
+      "filePath": "packages/server/src/lobby.ts",
+      "summary": "Multiplayer lobby manager that generates unique party codes, tracks active game rooms, and enables player discovery for joining existing games or creating new ones.",
+      "tags": [
+        "multiplayer",
+        "lobby",
+        "room-management",
+        "session"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/server/src/protocol.ts",
+      "type": "file",
+      "name": "protocol.ts",
+      "filePath": "packages/server/src/protocol.ts",
+      "summary": "Shared protocol definition for WebSocket messages between client and server. Defines all message types for authentication, lobbies, gameplay, player state synchronization, and real-time events.",
+      "tags": [
+        "protocol",
+        "schema",
+        "websocket",
+        "communication"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/server/src/room.ts",
+      "type": "file",
+      "name": "room.ts",
+      "filePath": "packages/server/src/room.ts",
+      "summary": "Game room controller managing player sessions, game loop execution, command validation, and state persistence. Coordinates player connections, world simulation ticks, and broadcasts game frames to all connected clients.",
+      "tags": [
+        "game-logic",
+        "room-management",
+        "server-sim",
+        "state-management"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Complex state machine handling lobby→playing transitions, reconnection windows, command rate-limiting, and periodic persistence of world state with device-to-player bindings."
+    },
+    {
+      "id": "file:packages/server/src/world-store.ts",
+      "type": "file",
+      "name": "world-store.ts",
+      "filePath": "packages/server/src/world-store.ts",
+      "summary": "Abstraction layer for world state persistence supporting both PostgreSQL and in-memory storage. Serializes and deserializes game simulation state alongside player-device bindings for session resumption.",
+      "tags": [
+        "persistence",
+        "world-state",
+        "storage",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/server/src/auth.ts:issueToken",
+      "type": "function",
+      "name": "issueToken",
+      "filePath": "packages/server/src/auth.ts",
+      "lineRange": [
+        6,
+        9
+      ],
+      "summary": "Generates a new anonymous device token with HMAC signature for authentication.",
+      "tags": [
+        "authentication",
+        "token-generation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/auth.ts:verifyToken",
+      "type": "function",
+      "name": "verifyToken",
+      "filePath": "packages/server/src/auth.ts",
+      "lineRange": [
+        11,
+        22
+      ],
+      "summary": "Validates anonymous device token using timing-safe HMAC comparison to prevent timing attacks.",
+      "tags": [
+        "authentication",
+        "security",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/auth.ts:sign",
+      "type": "function",
+      "name": "sign",
+      "filePath": "packages/server/src/auth.ts",
+      "lineRange": [
+        24,
+        26
+      ],
+      "summary": "Computes HMAC-SHA256 signature for device ID using environment-sourced secret.",
+      "tags": [
+        "cryptography",
+        "signature"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/db.ts:freshProfile",
+      "type": "function",
+      "name": "freshProfile",
+      "filePath": "packages/server/src/db.ts",
+      "lineRange": [
+        12,
+        22
+      ],
+      "summary": "Creates a new default player profile with initial stats and skill progression state.",
+      "tags": [
+        "profile-creation",
+        "default-state"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/db.ts:createPool",
+      "type": "function",
+      "name": "createPool",
+      "filePath": "packages/server/src/db.ts",
+      "lineRange": [
+        25,
+        28
+      ],
+      "summary": "Initializes PostgreSQL connection pool from DATABASE_URL environment variable, returning null for development mode.",
+      "tags": [
+        "database",
+        "initialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/db.ts:createStore",
+      "type": "function",
+      "name": "createStore",
+      "filePath": "packages/server/src/db.ts",
+      "lineRange": [
+        64,
+        73
+      ],
+      "summary": "Factory function that creates appropriate profile store (PostgreSQL or in-memory) based on pool availability.",
+      "tags": [
+        "factory",
+        "initialization",
+        "database-abstraction"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/db.ts:tryUnlockSkill",
+      "type": "function",
+      "name": "tryUnlockSkill",
+      "filePath": "packages/server/src/db.ts",
+      "lineRange": [
+        76,
+        84
+      ],
+      "summary": "Server-side skill unlock validation that checks availability, cost, and depletes player skill points.",
+      "tags": [
+        "validation",
+        "game-logic",
+        "skill-progression"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:packages/server/src/db.ts:PgStore",
+      "type": "class",
+      "name": "PgStore",
+      "filePath": "packages/server/src/db.ts",
+      "lineRange": [
+        31,
+        53
+      ],
+      "summary": "PostgreSQL-backed profile persistence implementing ProfileStore interface with JSONB storage.",
+      "tags": [
+        "persistence",
+        "database",
+        "postgres"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:packages/server/src/db.ts:MemoryStore",
+      "type": "class",
+      "name": "MemoryStore",
+      "filePath": "packages/server/src/db.ts",
+      "lineRange": [
+        56,
+        62
+      ],
+      "summary": "In-memory profile store for development and testing without database dependencies.",
+      "tags": [
+        "persistence",
+        "storage",
+        "development"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/index.ts:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "packages/server/src/index.ts",
+      "lineRange": [
+        23,
+        116
+      ],
+      "summary": "Async entry point initializing database/world stores, HTTP server, WebSocket listener, and game session coordinator.",
+      "tags": [
+        "entry-point",
+        "initialization",
+        "server"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:packages/server/src/lobby.ts:LobbyManager",
+      "type": "class",
+      "name": "LobbyManager",
+      "filePath": "packages/server/src/lobby.ts",
+      "lineRange": [
+        7,
+        34
+      ],
+      "summary": "Manages active game rooms with unique party codes, handles room creation, and enables player lookup for multiplayer discovery.",
+      "tags": [
+        "lobby-management",
+        "room-tracking",
+        "multiplayer"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/server/src/lobby.ts:createRoom",
+      "type": "function",
+      "name": "createRoom",
+      "filePath": "packages/server/src/lobby.ts",
+      "lineRange": [
+        12,
+        22
+      ],
+      "summary": "Generates unique 5-character party code and instantiates a new Room instance.",
+      "tags": [
+        "room-creation",
+        "code-generation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/lobby.ts:findJoinable",
+      "type": "function",
+      "name": "findJoinable",
+      "filePath": "packages/server/src/lobby.ts",
+      "lineRange": [
+        25,
+        31
+      ],
+      "summary": "Locates joinable room by code or reconnects existing player to their room if available.",
+      "tags": [
+        "room-lookup",
+        "reconnection"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/protocol.ts:encode",
+      "type": "function",
+      "name": "encode",
+      "filePath": "packages/server/src/protocol.ts",
+      "lineRange": [
+        47,
+        47
+      ],
+      "summary": "Serializes ServerMsg to JSON string for WebSocket transmission.",
+      "tags": [
+        "serialization",
+        "communication"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/protocol.ts:decode",
+      "type": "function",
+      "name": "decode",
+      "filePath": "packages/server/src/protocol.ts",
+      "lineRange": [
+        48,
+        53
+      ],
+      "summary": "Parses incoming JSON string to ClientMsg type with validation, returning null for invalid messages.",
+      "tags": [
+        "deserialization",
+        "validation",
+        "communication"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:packages/server/src/room.ts:Room",
+      "type": "class",
+      "name": "Room",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        28,
+        252
+      ],
+      "summary": "Game room orchestrating player sessions, simulation loop, and real-time state synchronization. Manages player connections, command handling, persistence, and game-to-lobby transitions.",
+      "tags": [
+        "game-room",
+        "session-management",
+        "state-machine"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:addPlayer",
+      "type": "function",
+      "name": "addPlayer",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        55,
+        75
+      ],
+      "summary": "Adds new player or reconnects existing player to room, handling lobby and mid-game joins.",
+      "tags": [
+        "player-management",
+        "reconnection"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:handleDisconnect",
+      "type": "function",
+      "name": "handleDisconnect",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        77,
+        84
+      ],
+      "summary": "Marks player as temporarily disconnected during reconnect window, removes from lobby, and checks for room cleanup.",
+      "tags": [
+        "connection-handling",
+        "cleanup"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:handleLeave",
+      "type": "function",
+      "name": "handleLeave",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        86,
+        94
+      ],
+      "summary": "Removes player from room while preserving their character state in the saved world.",
+      "tags": [
+        "player-management",
+        "persistence"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:handleStart",
+      "type": "function",
+      "name": "handleStart",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        96,
+        112
+      ],
+      "summary": "Starts game by loading saved world or creating fresh simulation, binding players to entities, and beginning tick loop.",
+      "tags": [
+        "game-start",
+        "initialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:attachSeatToSim",
+      "type": "function",
+      "name": "attachSeatToSim",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        115,
+        125
+      ],
+      "summary": "Binds player to saved entity in simulation or creates new player entity with unlocked skills.",
+      "tags": [
+        "player-binding",
+        "entity-management"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:handleCommand",
+      "type": "function",
+      "name": "handleCommand",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        127,
+        134
+      ],
+      "summary": "Validates and applies player command to simulation with rate-limiting per tick.",
+      "tags": [
+        "command-handling",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:handlePing",
+      "type": "function",
+      "name": "handlePing",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        136,
+        140
+      ],
+      "summary": "Broadcasts player ping marker to all connected clients.",
+      "tags": [
+        "communication",
+        "gameplay"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:handleChat",
+      "type": "function",
+      "name": "handleChat",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        142,
+        151
+      ],
+      "summary": "Sanitizes and broadcasts chat messages with spam throttling.",
+      "tags": [
+        "chat",
+        "communication"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:handleGhost",
+      "type": "function",
+      "name": "handleGhost",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        153,
+        161
+      ],
+      "summary": "Broadcasts building placement preview (ghost) state to other players.",
+      "tags": [
+        "building",
+        "gameplay"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:tick",
+      "type": "function",
+      "name": "tick",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        163,
+        172
+      ],
+      "summary": "Game loop step advancing simulation, broadcasting frame, resetting command counters, and persisting on schedule.",
+      "tags": [
+        "game-loop",
+        "simulation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:persist",
+      "type": "function",
+      "name": "persist",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        174,
+        179
+      ],
+      "summary": "Persists current world state and player bindings to storage with error handling.",
+      "tags": [
+        "persistence",
+        "storage"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:closeLobby",
+      "type": "function",
+      "name": "closeLobby",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        181,
+        186
+      ],
+      "summary": "Notifies all clients of lobby closure and destroys room state.",
+      "tags": [
+        "room-cleanup",
+        "communication"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:destroy",
+      "type": "function",
+      "name": "destroy",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        188,
+        188
+      ],
+      "summary": "Clears the game loop timer.",
+      "tags": [
+        "cleanup",
+        "lifecycle"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:checkEmpty",
+      "type": "function",
+      "name": "checkEmpty",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        190,
+        193
+      ],
+      "summary": "Checks for active players and destroys room if empty.",
+      "tags": [
+        "cleanup",
+        "lifecycle"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:buildFrame",
+      "type": "function",
+      "name": "buildFrame",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        197,
+        204
+      ],
+      "summary": "Constructs game frame message from simulation state and events.",
+      "tags": [
+        "communication",
+        "state-view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:playerViews",
+      "type": "function",
+      "name": "playerViews",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        205,
+        218
+      ],
+      "summary": "Transforms player entities into client-facing view objects with inventory and equipment.",
+      "tags": [
+        "state-view",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:buildingViews",
+      "type": "function",
+      "name": "buildingViews",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        219,
+        223
+      ],
+      "summary": "Transforms building entities into client-facing view objects.",
+      "tags": [
+        "state-view",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:groundItemViews",
+      "type": "function",
+      "name": "groundItemViews",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        224,
+        228
+      ],
+      "summary": "Transforms ground item entities into client-facing view objects.",
+      "tags": [
+        "state-view",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:nodeViews",
+      "type": "function",
+      "name": "nodeViews",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        229,
+        231
+      ],
+      "summary": "Transforms resource node entities into client-facing view objects.",
+      "tags": [
+        "state-view",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:sendGameStart",
+      "type": "function",
+      "name": "sendGameStart",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        233,
+        236
+      ],
+      "summary": "Sends game initialization message to a single player with world state.",
+      "tags": [
+        "communication",
+        "initialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:broadcastLobby",
+      "type": "function",
+      "name": "broadcastLobby",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        237,
+        242
+      ],
+      "summary": "Broadcasts lobby state with player list and host designation to all clients.",
+      "tags": [
+        "communication",
+        "state-view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:broadcast",
+      "type": "function",
+      "name": "broadcast",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        243,
+        248
+      ],
+      "summary": "Broadcasts any server message to all connected players.",
+      "tags": [
+        "communication"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:send",
+      "type": "function",
+      "name": "send",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        249,
+        251
+      ],
+      "summary": "Sends server message to a single player if connected.",
+      "tags": [
+        "communication"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:validCommand",
+      "type": "function",
+      "name": "validCommand",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        254,
+        267
+      ],
+      "summary": "Validates command structure and parameters before applying to simulation.",
+      "tags": [
+        "validation",
+        "game-logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/server/src/room.ts:isFiniteVec",
+      "type": "function",
+      "name": "isFiniteVec",
+      "filePath": "packages/server/src/room.ts",
+      "lineRange": [
+        268,
+        271
+      ],
+      "summary": "Validates vector structure with finite x and y components.",
+      "tags": [
+        "validation",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:packages/server/src/world-store.ts:PgWorldStore",
+      "type": "class",
+      "name": "PgWorldStore",
+      "filePath": "packages/server/src/world-store.ts",
+      "lineRange": [
+        16,
+        49
+      ],
+      "summary": "PostgreSQL-backed world state persistence with serialization and error recovery.",
+      "tags": [
+        "persistence",
+        "database",
+        "world-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:packages/server/src/world-store.ts:MemoryWorldStore",
+      "type": "class",
+      "name": "MemoryWorldStore",
+      "filePath": "packages/server/src/world-store.ts",
+      "lineRange": [
+        51,
+        63
+      ],
+      "summary": "In-memory world store that serializes state to simulate persistence for testing.",
+      "tags": [
+        "persistence",
+        "storage",
+        "testing"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/server/src/world-store.ts:createWorldStore",
+      "type": "function",
+      "name": "createWorldStore",
+      "filePath": "packages/server/src/world-store.ts",
+      "lineRange": [
+        65,
+        68
+      ],
+      "summary": "Factory function selecting appropriate world store implementation based on database availability.",
+      "tags": [
+        "factory",
+        "initialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/client/src/audio.ts",
+      "type": "file",
+      "name": "audio.ts",
+      "filePath": "packages/client/src/audio.ts",
+      "summary": "Procedural WebAudio synthesizer for all game sound effects and adaptive ambient music. Generates SFX via oscillators and noise for gathering, combat, and environmental events; music layers mood-based chords that respond to day/night/boss phases.",
+      "tags": [
+        "audio-engine",
+        "synthesis",
+        "event-handler",
+        "lifecycle"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Uses Web Audio API with oscillators, filters, and envelope generators to synthesize all sounds procedurally without external assets."
+    },
+    {
+      "id": "function:packages/client/src/audio.ts:unlock",
+      "type": "function",
+      "name": "unlock",
+      "filePath": "packages/client/src/audio.ts",
+      "lineRange": [
+        16,
+        25
+      ],
+      "summary": "Initializes AudioContext and main/music gain nodes on first user gesture (required for Web Audio API).",
+      "tags": [
+        "initialization",
+        "lifecycle"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/client/src/audio.ts:handle",
+      "type": "function",
+      "name": "handle",
+      "filePath": "packages/client/src/audio.ts",
+      "lineRange": [
+        27,
+        43
+      ],
+      "summary": "Dispatches SimEvents to appropriate sound effect generators (swing, gather, pickup, eat, build, destroy).",
+      "tags": [
+        "event-handler",
+        "dispatcher"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/client/src/audio.ts:setPhase",
+      "type": "function",
+      "name": "setPhase",
+      "filePath": "packages/client/src/audio.ts",
+      "lineRange": [
+        45,
+        48
+      ],
+      "summary": "Updates ambient music mood based on day/night phase transition.",
+      "tags": [
+        "state-management"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/client/src/audio.ts:setMood",
+      "type": "function",
+      "name": "setMood",
+      "filePath": "packages/client/src/audio.ts",
+      "lineRange": [
+        264,
+        292
+      ],
+      "summary": "Manages ambient drone layers: stops previous oscillators and starts new chord voices with tremolo LFO based on mood (day/night/boss).",
+      "tags": [
+        "state-management",
+        "synthesis"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:packages/client/src/audio.ts:Audio",
+      "type": "class",
+      "name": "Audio",
+      "filePath": "packages/client/src/audio.ts",
+      "lineRange": [
+        7,
+        293
+      ],
+      "summary": "Manages all game audio via Web Audio API synthesis. Handles SFX throttling, procedural music generation, and context lifecycle.",
+      "tags": [
+        "audio-engine",
+        "singleton",
+        "lifecycle"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/client/src/input.ts",
+      "type": "file",
+      "name": "input.ts",
+      "filePath": "packages/client/src/input.ts",
+      "summary": "Keyboard and mouse input controller with visual build-placement ghost overlay and client-side validity preview (green for valid, red for blocked).",
+      "tags": [
+        "input-handler",
+        "ui-controller",
+        "visualization"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:packages/client/src/input.ts:Input",
+      "type": "class",
+      "name": "Input",
+      "filePath": "packages/client/src/input.ts",
+      "lineRange": [
+        14,
+        246
+      ],
+      "summary": "Captures keyboard/mouse input, manages building placement preview, handles drag-to-paint walls with rectangle outline, and forwards commands to server.",
+      "tags": [
+        "input-handler",
+        "ui-controller",
+        "state-machine"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/client/src/input.ts:setBuildType",
+      "type": "function",
+      "name": "setBuildType",
+      "filePath": "packages/client/src/input.ts",
+      "lineRange": [
+        138,
+        169
+      ],
+      "summary": "Activates or deactivates build mode; creates transparent ghost model with semi-transparent placement plate and validity indicator sprite.",
+      "tags": [
+        "ui-controller",
+        "state-machine"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/client/src/input.ts:updateGhost",
+      "type": "function",
+      "name": "updateGhost",
+      "filePath": "packages/client/src/input.ts",
+      "lineRange": [
+        225,
+        240
+      ],
+      "summary": "Updates build ghost position and validity state each frame; animates indicator sprite and updates placement plate color.",
+      "tags": [
+        "rendering",
+        "state-management"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/client/src/main.ts",
+      "type": "file",
+      "name": "main.ts",
+      "filePath": "packages/client/src/main.ts",
+      "summary": "Application entry point and state orchestrator. Wires together rendering, networking, input, UI, and audio systems; routes server messages to subsystems and broadcasts events.",
+      "tags": [
+        "entry-point",
+        "orchestrator",
+        "state-machine"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Uses callbacks and event handlers to coordinate between subsystems; implements input loops at 20Hz and latency probes every 2 seconds."
+    },
+    {
+      "id": "function:packages/client/src/main.ts:project",
+      "type": "function",
+      "name": "project",
+      "filePath": "packages/client/src/main.ts",
+      "lineRange": [
+        183,
+        187
+      ],
+      "summary": "Projects world coordinates to screen coordinates using camera projection matrix.",
+      "tags": [
+        "utility",
+        "graphics"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/client/src/main.ts:loop",
+      "type": "function",
+      "name": "loop",
+      "filePath": "packages/client/src/main.ts",
+      "lineRange": [
+        249,
+        310
+      ],
+      "summary": "Main game loop: updates input, renders world, computes nearest node for gather prompts, manages building hover state, and syncs UI with frame data.",
+      "tags": [
+        "rendering-loop",
+        "orchestrator"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/client/src/net.ts",
+      "type": "file",
+      "name": "net.ts",
+      "filePath": "packages/client/src/net.ts",
+      "summary": "WebSocket client for bidirectional server communication. Queues messages during connection loss and auto-reconnects; broadcasts server messages to all registered handlers.",
+      "tags": [
+        "networking",
+        "singleton",
+        "event-emitter"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:packages/client/src/net.ts:Net",
+      "type": "class",
+      "name": "Net",
+      "filePath": "packages/client/src/net.ts",
+      "lineRange": [
+        10,
+        46
+      ],
+      "summary": "Manages WebSocket lifecycle, message queuing during offline periods, and handler registration for server messages.",
+      "tags": [
+        "networking",
+        "singleton"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/client/src/net.ts:connect",
+      "type": "function",
+      "name": "connect",
+      "filePath": "packages/client/src/net.ts",
+      "lineRange": [
+        15,
+        32
+      ],
+      "summary": "Establishes WebSocket connection, flushes queued messages, persists auth tokens, and sets up auto-reconnect.",
+      "tags": [
+        "networking",
+        "initialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/client/src/render/effects.ts",
+      "type": "file",
+      "name": "effects.ts",
+      "filePath": "packages/client/src/render/effects.ts",
+      "summary": "Pooled particle effects system driven by SimEvents. Handles bursts, shockwaves, tracers, lightning bolts, footprints, and trails with efficient mesh recycling.",
+      "tags": [
+        "particle-system",
+        "effects-engine",
+        "rendering"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:packages/client/src/render/effects.ts:Effects",
+      "type": "class",
+      "name": "Effects",
+      "filePath": "packages/client/src/render/effects.ts",
+      "lineRange": [
+        17,
+        244
+      ],
+      "summary": "Manages pooled particles, beams, rings, flashes, and footprints. Responds to damage, building destruction, and gathering events.",
+      "tags": [
+        "particle-system",
+        "object-pool",
+        "event-handler"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/client/src/render/effects.ts:handle",
+      "type": "function",
+      "name": "handle",
+      "filePath": "packages/client/src/render/effects.ts",
+      "lineRange": [
+        31,
+        60
+      ],
+      "summary": "Dispatches SimEvents to particle burst and shockwave generators with per-event-kind parameters.",
+      "tags": [
+        "event-handler",
+        "dispatcher"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/client/src/render/effects.ts:update",
+      "type": "function",
+      "name": "update",
+      "filePath": "packages/client/src/render/effects.ts",
+      "lineRange": [
+        182,
+        243
+      ],
+      "summary": "Updates all active effects: advances particle physics, manages lifecycle, recycles pooled meshes, and updates opacity/scale fades.",
+      "tags": [
+        "rendering-loop",
+        "object-pool"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/client/src/render/environment.ts",
+      "type": "file",
+      "name": "environment.ts",
+      "filePath": "packages/client/src/render/environment.ts",
+      "summary": "Deterministic procedural world decoration generator. Creates river with parallax water, bridges, paths, buildings, cemeteries, watchtowers, windmills, swamps, fog, and seasonal weather particles seeded from game world.",
+      "tags": [
+        "rendering",
+        "procedural-generation",
+        "environment"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Uses seeded RNG to ensure all players see identical decorations; defers placement to map-side occupancy grid to avoid collisions with gameplay objects."
+    },
+    {
+      "id": "class:packages/client/src/render/environment.ts:Environment",
+      "type": "class",
+      "name": "Environment",
+      "filePath": "packages/client/src/render/environment.ts",
+      "lineRange": [
+        56,
+        110
+      ],
+      "summary": "Generates and manages visual environment: ground patches, river system, pathways, decorative structures (houses, ruins, cemeteries, watchtowers), vegetation, and weather.",
+      "tags": [
+        "rendering",
+        "procedural-generation",
+        "lifecycle"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/client/src/render/models.ts",
+      "type": "file",
+      "name": "models.ts",
+      "filePath": "packages/client/src/render/models.ts",
+      "summary": "Procedural low-poly 3D models for all game entities. Generates buildings (walls, gate, spike, crafting table), player character (survivor/knight with equipment), and procedural textures (stone, wood).",
+      "tags": [
+        "rendering",
+        "procedural-generation",
+        "asset-generation"
+      ],
+      "complexity": "complex",
+      "languageNotes": "All geometry and textures generated procedurally via Three.js; textures created with Canvas 2D to emulate stone masonry and wood grain."
+    },
+    {
+      "id": "function:packages/client/src/render/models.ts:buildingModel",
+      "type": "function",
+      "name": "buildingModel",
+      "filePath": "packages/client/src/render/models.ts",
+      "lineRange": [
+        141,
+        198
+      ],
+      "summary": "Generates three-dimensional models for all building types at given tier; scales and adds reinforcements based on tier.",
+      "tags": [
+        "model-factory",
+        "procedural-generation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/client/src/render/models.ts:playerModel",
+      "type": "function",
+      "name": "playerModel",
+      "filePath": "packages/client/src/render/models.ts",
+      "lineRange": [
+        202,
+        350
+      ],
+      "summary": "Generates full survivor/knight character model with armor, weapons, equipment, and animation hooks for limbs and attachments.",
+      "tags": [
+        "model-factory",
+        "procedural-generation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/client/src/render/scene.ts",
+      "type": "file",
+      "name": "scene.ts",
+      "filePath": "packages/client/src/render/scene.ts",
+      "summary": "Three.js rendering stage with orthographic camera, post-processing bloom, day/night lighting, seasonal color grading, and procedural ground texture. Manages camera follow, zoom, and screen-to-world raycasting.",
+      "tags": [
+        "rendering",
+        "camera-controller",
+        "post-processing"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Implements seasonal blending across 4 palettes with dusk transition effects; uses instanced meshes for weather particles (snow, leaves)."
+    },
+    {
+      "id": "class:packages/client/src/render/scene.ts:Stage",
+      "type": "class",
+      "name": "Stage",
+      "filePath": "packages/client/src/render/scene.ts",
+      "lineRange": [
+        24,
+        290
+      ],
+      "summary": "Manages Three.js scene graph, camera, lighting, post-processing, and rendering loop. Provides screen-to-world conversion and dynamic day/night/seasonal color grading.",
+      "tags": [
+        "rendering",
+        "camera-controller",
+        "lifecycle"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/client/src/render/scene.ts:update",
+      "type": "function",
+      "name": "update",
+      "filePath": "packages/client/src/render/scene.ts",
+      "lineRange": [
+        177,
+        213
+      ],
+      "summary": "Updates camera position, lighting intensity, colors, and fog based on time of day and season; advances weather particles.",
+      "tags": [
+        "rendering-loop",
+        "time-manager"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/client/src/render/scene.ts:screenToWorld",
+      "type": "function",
+      "name": "screenToWorld",
+      "filePath": "packages/client/src/render/scene.ts",
+      "lineRange": [
+        168,
+        175
+      ],
+      "summary": "Converts screen pixel coordinates to world XZ coordinates via camera raycasting onto ground plane.",
+      "tags": [
+        "utility",
+        "graphics"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/client/src/ui/character.ts",
+      "type": "file",
+      "name": "character.ts",
+      "filePath": "packages/client/src/ui/character.ts",
+      "summary": "Character screen UI with live 3D portrait, equipment display, crafting recipes (hand-based), and building placement menu. Portrait renders survivor model with idle animation and dynamic lighting.",
+      "tags": [
+        "ui-component",
+        "character-screen",
+        "3d-rendering"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Portrait class manages separate WebGL renderer, scene, and lighting; synchronizes with main game state to show inventory and available recipes."
+    },
+    {
+      "id": "class:packages/client/src/ui/character.ts:Portrait",
+      "type": "class",
+      "name": "Portrait",
+      "filePath": "packages/client/src/ui/character.ts",
+      "lineRange": [
+        31,
+        110
+      ],
+      "summary": "Standalone WebGL portrait of player character with idle breathing and turning animation. Initializes renderer within host element on first use.",
+      "tags": [
+        "3d-rendering",
+        "ui-component"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/client/src/ui/character.ts:createCharacterUI",
+      "type": "function",
+      "name": "createCharacterUI",
+      "filePath": "packages/client/src/ui/character.ts",
+      "lineRange": [
+        112,
+        256
+      ],
+      "summary": "Factory function creating character screen interface with three-column layout: portrait + equipment, recipes, and status.",
+      "tags": [
+        "ui-factory",
+        "character-screen"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/client/src/ui/craft.ts",
+      "type": "file",
+      "name": "craft.ts",
+      "filePath": "packages/client/src/ui/craft.ts",
+      "summary": "Crafting panel UI showing table-based recipes with ingredient costs and repair option. Appears when player is near a crafting table.",
+      "tags": [
+        "ui-component",
+        "crafting-panel"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/client/src/ui/hud.ts",
+      "type": "file",
+      "name": "hud.ts",
+      "filePath": "packages/client/src/ui/hud.ts",
+      "summary": "Core HUD management: building selection panel, item notifications, phase announcements, minimap, performance display, and chat. Routes UI events back to main systems.",
+      "tags": [
+        "ui-component",
+        "hud",
+        "orchestrator"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/client/src/ui/inventory.ts",
+      "type": "file",
+      "name": "inventory.ts",
+      "filePath": "packages/client/src/ui/inventory.ts",
+      "summary": "Inventory UI with hotbar and backpack slots. Supports drag-reorder, item dropping, hand selection, and durability visualization.",
+      "tags": [
+        "ui-component",
+        "inventory"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/client/src/ui/screens.ts",
+      "type": "file",
+      "name": "screens.ts",
+      "filePath": "packages/client/src/ui/screens.ts",
+      "summary": "Modal screen manager for menu, lobby, skill tree, and toasts. Handles game lifecycle events (welcome, lobby join, game start, disconnect).",
+      "tags": [
+        "ui-component",
+        "screen-manager",
+        "state-machine"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/client/src/render/world.ts:gatherSwing",
+      "type": "function",
+      "name": "gatherSwing",
+      "filePath": "packages/client/src/render/world.ts",
+      "lineRange": [
+        1,
+        50
+      ],
+      "summary": "Animates gather attack arc for visual feedback during resource collection.",
+      "tags": [
+        "animation",
+        "visual-feedback"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/client/src/render/world.ts",
+      "type": "file",
+      "name": "world.ts",
+      "filePath": "packages/client/src/render/world.ts",
+      "summary": "Game world renderer managing player avatars, buildings, nodes (trees/rocks/berries), and ground items. Handles animations (walking, gathering, melee, death), collision querying, and minimap updates.",
+      "tags": [
+        "rendering",
+        "world-manager",
+        "entity-system"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Uses animation callbacks from procedural models (legs, arms, body, turrets) and maintains parallel collider state for physics queries."
+    },
+    {
+      "id": "file:scripts/deploy-vps.mjs",
+      "type": "file",
+      "name": "deploy-vps.mjs",
+      "filePath": "scripts/deploy-vps.mjs",
+      "summary": "One-shot VPS deployer that establishes SSH connection with environment-provided credentials, installs Docker if needed, clones or updates the game repository, generates secure environment secrets, and brings up the full Docker Compose stack on remote server.",
+      "tags": [
+        "entry-point",
+        "deployment",
+        "infrastructure",
+        "script",
+        "devops"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Uses SSH2 client library for remote command execution; embedded shell script handles idempotent Docker installation, git repository management, and secret generation via crypto randomBytes."
+    },
+    {
+      "id": "file:scripts/diag.mjs",
+      "type": "file",
+      "name": "diag.mjs",
+      "filePath": "scripts/diag.mjs",
+      "summary": "Diagnostic utility that connects to VPS via SSH and executes remote inspection commands to gather container status, application logs, HTTP health check, and firewall configuration state.",
+      "tags": [
+        "entry-point",
+        "diagnostic",
+        "infrastructure",
+        "script",
+        "debugging"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:scripts/fix-port.mjs",
+      "type": "file",
+      "name": "fix-port.mjs",
+      "filePath": "scripts/fix-port.mjs",
+      "summary": "Troubleshooting utility that identifies processes holding port 80, removes orphaned Docker containers and competing web servers (nginx, apache2), restarts the Docker Compose stack, and verifies HTTP availability.",
+      "tags": [
+        "entry-point",
+        "troubleshooting",
+        "infrastructure",
+        "script",
+        "devops"
+      ],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:README.md",
+      "target": "config:package.json",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:packages/client/index.html",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "service:Dockerfile",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:tsconfig.base.json",
+      "target": "config:packages/client/tsconfig.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:tsconfig.base.json",
+      "target": "config:packages/server/tsconfig.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:tsconfig.base.json",
+      "target": "config:packages/shared/tsconfig.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:package.json",
+      "target": "config:packages/client/package.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:package.json",
+      "target": "config:packages/server/package.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:package.json",
+      "target": "config:packages/shared/package.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "service:Dockerfile",
+      "target": "config:package.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "service:Dockerfile",
+      "target": "file:packages/client/index.html",
+      "type": "deploys",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "config:docker-compose.yml",
+      "target": "service:Dockerfile",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:docker-compose.yml",
+      "target": "file:.env.example",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:Caddyfile",
+      "target": "config:docker-compose.yml",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/client/vite.config.ts",
+      "target": "config:packages/client/package.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/client/index.html",
+      "target": "file:packages/client/style.css",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "document:docs/superpowers/specs/2026-06-12-last-fortress-design.md",
+      "target": "document:prompt.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/superpowers/specs/2026-06-13-survival-conversion-design.md",
+      "target": "document:docs/superpowers/specs/2026-06-12-last-fortress-design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/superpowers/plans/2026-06-12-phase1-sim-core.md",
+      "target": "document:docs/superpowers/specs/2026-06-12-last-fortress-design.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/superpowers/plans/2026-06-13-phase0-survival-core.md",
+      "target": "document:docs/superpowers/specs/2026-06-13-survival-conversion-design.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/superpowers/plans/2026-06-13-phase1-crafting.md",
+      "target": "document:docs/superpowers/specs/2026-06-13-phase1-crafting-design.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:CLAUDE.md",
+      "target": "document:README.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/sim.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/rng.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/grid.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/mapgen.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/data/items.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/inventory.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/data/recipes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/regions.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/constants.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/data/buildings.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/data/skills.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/decor.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/snapshot.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/combat.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/src/sim/river.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/combat.ts",
+      "target": "file:packages/shared/src/sim/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/combat.ts",
+      "target": "function:packages/shared/src/sim/combat.ts:dist",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/combat.ts",
+      "target": "function:packages/shared/src/sim/combat.ts:buildingCenter",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/data/buildings.ts",
+      "target": "file:packages/shared/src/sim/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/data/buildings.ts",
+      "target": "file:packages/shared/src/sim/data/items.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/data/items.ts",
+      "target": "function:packages/shared/src/sim/data/items.ts:isDurable",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/data/recipes.ts",
+      "target": "file:packages/shared/src/sim/data/items.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/data/recipes.ts",
+      "target": "function:packages/shared/src/sim/data/recipes.ts:recipeById",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/data/skills.ts",
+      "target": "function:packages/shared/src/sim/data/skills.ts:defaultModifiers",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/data/skills.ts",
+      "target": "function:packages/shared/src/sim/data/skills.ts:applySkills",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/decor.ts",
+      "target": "file:packages/shared/src/sim/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/decor.ts",
+      "target": "file:packages/shared/src/sim/rng.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/decor.ts",
+      "target": "file:packages/shared/src/sim/constants.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/decor.ts",
+      "target": "file:packages/shared/src/sim/river.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/decor.ts",
+      "target": "function:packages/shared/src/sim/decor.ts:generateDecor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/decor.ts",
+      "target": "function:packages/shared/src/sim/decor.ts:decorBlocks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/grid.ts",
+      "target": "file:packages/shared/src/sim/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/grid.ts",
+      "target": "class:packages/shared/src/sim/grid.ts:Grid",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/inventory.ts",
+      "target": "file:packages/shared/src/sim/data/items.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/inventory.ts",
+      "target": "function:packages/shared/src/sim/inventory.ts:addItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/inventory.ts",
+      "target": "function:packages/shared/src/sim/inventory.ts:removeItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/inventory.ts",
+      "target": "function:packages/shared/src/sim/inventory.ts:countItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/inventory.ts",
+      "target": "function:packages/shared/src/sim/inventory.ts:firstEmpty",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/inventory.ts",
+      "target": "function:packages/shared/src/sim/inventory.ts:moveSlot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/inventory.ts",
+      "target": "function:packages/shared/src/sim/inventory.ts:emptyInventory",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/inventory.ts",
+      "target": "function:packages/shared/src/sim/inventory.ts:giveItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/mapgen.ts",
+      "target": "file:packages/shared/src/sim/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/mapgen.ts",
+      "target": "file:packages/shared/src/sim/rng.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/mapgen.ts",
+      "target": "file:packages/shared/src/sim/constants.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/mapgen.ts",
+      "target": "file:packages/shared/src/sim/river.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/mapgen.ts",
+      "target": "file:packages/shared/src/sim/regions.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/mapgen.ts",
+      "target": "function:packages/shared/src/sim/mapgen.ts:generateMap",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/regions.ts",
+      "target": "file:packages/shared/src/sim/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/regions.ts",
+      "target": "file:packages/shared/src/sim/rng.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/regions.ts",
+      "target": "file:packages/shared/src/sim/constants.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/regions.ts",
+      "target": "function:packages/shared/src/sim/regions.ts:generateRegions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/regions.ts",
+      "target": "function:packages/shared/src/sim/regions.ts:regionAt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/river.ts",
+      "target": "file:packages/shared/src/sim/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/river.ts",
+      "target": "file:packages/shared/src/sim/rng.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/river.ts",
+      "target": "file:packages/shared/src/sim/constants.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/river.ts",
+      "target": "function:packages/shared/src/sim/river.ts:riverParams",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/river.ts",
+      "target": "function:packages/shared/src/sim/river.ts:riverYAt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/river.ts",
+      "target": "function:packages/shared/src/sim/river.ts:onBridge",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/river.ts",
+      "target": "function:packages/shared/src/sim/river.ts:inRiver",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/river.ts",
+      "target": "function:packages/shared/src/sim/river.ts:inRiverBand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/river.ts",
+      "target": "function:packages/shared/src/sim/river.ts:crossesBridgeRail",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/rng.ts",
+      "target": "class:packages/shared/src/sim/rng.ts:Rng",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/snapshot.ts",
+      "target": "file:packages/shared/src/sim/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/snapshot.ts",
+      "target": "function:packages/shared/src/sim/snapshot.ts:serializeState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/snapshot.ts",
+      "target": "function:packages/shared/src/sim/snapshot.ts:deserializeState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/rng.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/grid.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/mapgen.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/regions.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/data/buildings.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/data/skills.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/combat.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/data/items.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/inventory.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/data/recipes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/river.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/decor.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "file:packages/shared/src/sim/constants.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/sim.ts",
+      "target": "class:packages/shared/src/sim/sim.ts:Sim",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/shared/test/rng.test.ts",
+      "target": "file:packages/shared/src/sim/rng.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/sim/rng.ts",
+      "target": "file:packages/shared/test/rng.test.ts",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5,
+      "description": "Direction corrected (was test → production)"
+    },
+    {
+      "source": "file:packages/shared/test/smoke.test.ts",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/shared/src/index.ts",
+      "target": "file:packages/shared/test/smoke.test.ts",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5,
+      "description": "Direction corrected (was test → production)"
+    },
+    {
+      "source": "file:packages/server/src/auth.ts",
+      "target": "function:packages/server/src/auth.ts:issueToken",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/auth.ts",
+      "target": "function:packages/server/src/auth.ts:verifyToken",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/auth.ts",
+      "target": "function:packages/server/src/auth.ts:sign",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/db.ts",
+      "target": "function:packages/server/src/db.ts:freshProfile",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/db.ts",
+      "target": "function:packages/server/src/db.ts:createPool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/db.ts",
+      "target": "function:packages/server/src/db.ts:createStore",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/db.ts",
+      "target": "function:packages/server/src/db.ts:tryUnlockSkill",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/db.ts",
+      "target": "class:packages/server/src/db.ts:PgStore",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/db.ts",
+      "target": "class:packages/server/src/db.ts:MemoryStore",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/index.ts",
+      "target": "function:packages/server/src/index.ts:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/lobby.ts",
+      "target": "class:packages/server/src/lobby.ts:LobbyManager",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/lobby.ts:LobbyManager",
+      "target": "function:packages/server/src/lobby.ts:createRoom",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/lobby.ts:LobbyManager",
+      "target": "function:packages/server/src/lobby.ts:findJoinable",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/protocol.ts",
+      "target": "function:packages/server/src/protocol.ts:encode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/protocol.ts",
+      "target": "function:packages/server/src/protocol.ts:decode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/room.ts",
+      "target": "class:packages/server/src/room.ts:Room",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:addPlayer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:handleDisconnect",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:handleLeave",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:handleStart",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:attachSeatToSim",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:handleCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:handlePing",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:handleChat",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:handleGhost",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:tick",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:persist",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:closeLobby",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:destroy",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:checkEmpty",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:buildFrame",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:playerViews",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:buildingViews",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:groundItemViews",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:nodeViews",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:sendGameStart",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:broadcastLobby",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:broadcast",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:send",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/room.ts",
+      "target": "function:packages/server/src/room.ts:validCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/room.ts",
+      "target": "function:packages/server/src/room.ts:isFiniteVec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/world-store.ts",
+      "target": "class:packages/server/src/world-store.ts:PgWorldStore",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/world-store.ts",
+      "target": "class:packages/server/src/world-store.ts:MemoryWorldStore",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/server/src/world-store.ts",
+      "target": "function:packages/server/src/world-store.ts:createWorldStore",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:packages/server/src/index.ts:main",
+      "target": "function:packages/server/src/db.ts:createPool",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/server/src/index.ts:main",
+      "target": "function:packages/server/src/db.ts:createStore",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/server/src/index.ts:main",
+      "target": "function:packages/server/src/world-store.ts:createWorldStore",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/server/src/index.ts:main",
+      "target": "function:packages/server/src/auth.ts:issueToken",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/server/src/index.ts:main",
+      "target": "function:packages/server/src/auth.ts:verifyToken",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/server/src/index.ts:main",
+      "target": "function:packages/server/src/protocol.ts:decode",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/server/src/index.ts:main",
+      "target": "function:packages/server/src/protocol.ts:encode",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/server/src/index.ts:main",
+      "target": "function:packages/server/src/db.ts:tryUnlockSkill",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/protocol.ts:encode",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/server/src/room.ts:Room",
+      "target": "function:packages/server/src/room.ts:validCommand",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/server/src/lobby.ts:LobbyManager",
+      "target": "class:packages/server/src/room.ts:Room",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/audio.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/input.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/net.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/render/scene.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/render/world.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/render/effects.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/render/environment.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/ui/hud.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/ui/screens.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/ui/inventory.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/ui/craft.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "file:packages/client/src/ui/character.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/input.ts",
+      "target": "file:packages/client/src/render/scene.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/client/src/input.ts",
+      "target": "file:packages/client/src/render/models.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/client/src/render/world.ts",
+      "target": "file:packages/client/src/render/models.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/render/world.ts",
+      "target": "file:packages/client/src/render/scene.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/client/src/ui/character.ts",
+      "target": "file:packages/client/src/render/models.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/client/src/render/effects.ts",
+      "target": "file:packages/client/src/render/scene.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/client/src/render/environment.ts",
+      "target": "file:packages/client/src/render/scene.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/client/src/audio.ts",
+      "target": "class:packages/client/src/audio.ts:Audio",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/audio.ts",
+      "target": "function:packages/client/src/audio.ts:unlock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/audio.ts",
+      "target": "function:packages/client/src/audio.ts:handle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/audio.ts",
+      "target": "function:packages/client/src/audio.ts:setPhase",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/audio.ts",
+      "target": "function:packages/client/src/audio.ts:setMood",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/input.ts",
+      "target": "class:packages/client/src/input.ts:Input",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/input.ts",
+      "target": "function:packages/client/src/input.ts:setBuildType",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/input.ts",
+      "target": "function:packages/client/src/input.ts:updateGhost",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "function:packages/client/src/main.ts:project",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/main.ts",
+      "target": "function:packages/client/src/main.ts:loop",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/net.ts",
+      "target": "class:packages/client/src/net.ts:Net",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/net.ts",
+      "target": "function:packages/client/src/net.ts:connect",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/render/effects.ts",
+      "target": "class:packages/client/src/render/effects.ts:Effects",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/render/effects.ts",
+      "target": "function:packages/client/src/render/effects.ts:handle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/render/effects.ts",
+      "target": "function:packages/client/src/render/effects.ts:update",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/render/environment.ts",
+      "target": "class:packages/client/src/render/environment.ts:Environment",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/render/models.ts",
+      "target": "function:packages/client/src/render/models.ts:buildingModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/render/models.ts",
+      "target": "function:packages/client/src/render/models.ts:playerModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/render/scene.ts",
+      "target": "class:packages/client/src/render/scene.ts:Stage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/render/scene.ts",
+      "target": "function:packages/client/src/render/scene.ts:update",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/render/scene.ts",
+      "target": "function:packages/client/src/render/scene.ts:screenToWorld",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/ui/character.ts",
+      "target": "class:packages/client/src/ui/character.ts:Portrait",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/ui/character.ts",
+      "target": "function:packages/client/src/ui/character.ts:createCharacterUI",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/client/src/render/world.ts",
+      "target": "function:packages/client/src/render/world.ts:gatherSwing",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "class:packages/client/src/audio.ts:Audio",
+      "target": "function:packages/client/src/audio.ts:unlock",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/client/src/input.ts:Input",
+      "target": "function:packages/client/src/input.ts:setBuildType",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/render/models.ts",
+      "target": "function:packages/client/src/render/models.ts:buildingModel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/render/models.ts",
+      "target": "function:packages/client/src/render/models.ts:playerModel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/render/scene.ts",
+      "target": "class:packages/client/src/render/scene.ts:Stage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/ui/character.ts",
+      "target": "function:packages/client/src/ui/character.ts:createCharacterUI",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/client/src/net.ts",
+      "target": "class:packages/client/src/net.ts:Net",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/client/src/main.ts:loop",
+      "target": "function:packages/client/src/render/scene.ts:screenToWorld",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:simulation-core",
+      "name": "Simulation Core",
+      "description": "Deterministic game simulation engine running at 20 Hz, orchestrating world state, entity interactions, inventory, building placement, crafting, and combat calculations shared across server and client",
+      "nodeIds": [
+        "file:packages/shared/src/index.ts",
+        "file:packages/shared/src/sim/sim.ts",
+        "file:packages/shared/src/sim/types.ts",
+        "file:packages/shared/src/sim/constants.ts",
+        "file:packages/shared/src/sim/inventory.ts",
+        "file:packages/shared/src/sim/grid.ts",
+        "file:packages/shared/src/sim/combat.ts",
+        "file:packages/shared/src/sim/snapshot.ts"
+      ]
+    },
+    {
+      "id": "layer:world-generation",
+      "name": "World Generation",
+      "description": "Procedural map generation using seeded randomization to create biomes, terrain, resources, rivers, and decorative elements for deterministic world replication",
+      "nodeIds": [
+        "file:packages/shared/src/sim/mapgen.ts",
+        "file:packages/shared/src/sim/regions.ts",
+        "file:packages/shared/src/sim/river.ts",
+        "file:packages/shared/src/sim/decor.ts",
+        "file:packages/shared/src/sim/rng.ts"
+      ]
+    },
+    {
+      "id": "layer:game-content",
+      "name": "Game Content",
+      "description": "Game balance data defining items, crafting recipes, buildings, and skill progression systems used by simulation and UI layers",
+      "nodeIds": [
+        "file:packages/shared/src/sim/data/items.ts",
+        "file:packages/shared/src/sim/data/recipes.ts",
+        "file:packages/shared/src/sim/data/buildings.ts",
+        "file:packages/shared/src/sim/data/skills.ts"
+      ]
+    },
+    {
+      "id": "layer:server-networking",
+      "name": "Server Networking",
+      "description": "WebSocket server, room management, client-server protocol, lobby matchmaking, and message routing for multiplayer synchronization",
+      "nodeIds": [
+        "file:packages/server/src/index.ts",
+        "file:packages/server/src/room.ts",
+        "file:packages/server/src/lobby.ts",
+        "file:packages/server/src/protocol.ts"
+      ]
+    },
+    {
+      "id": "layer:server-persistence",
+      "name": "Server Persistence",
+      "description": "Authentication via JWT tokens, player profile management, world state snapshots, and database abstraction with PostgreSQL or in-memory fallback",
+      "nodeIds": [
+        "file:packages/server/src/auth.ts",
+        "file:packages/server/src/db.ts",
+        "file:packages/server/src/world-store.ts"
+      ]
+    },
+    {
+      "id": "layer:client-renderer",
+      "name": "Client Renderer",
+      "description": "Three.js-based 3D rendering pipeline with procedural model generation, terrain rendering, visual effects, particles, and post-processing",
+      "nodeIds": [
+        "file:packages/client/src/render/scene.ts",
+        "file:packages/client/src/render/world.ts",
+        "file:packages/client/src/render/environment.ts",
+        "file:packages/client/src/render/models.ts",
+        "file:packages/client/src/render/effects.ts"
+      ]
+    },
+    {
+      "id": "layer:client-frontend",
+      "name": "Client Frontend",
+      "description": "Player-facing UI including HUD, character screen, inventory, crafting panels, navigation screens, plus input handling, audio synthesis, and WebSocket networking",
+      "nodeIds": [
+        "file:packages/client/src/main.ts",
+        "file:packages/client/src/net.ts",
+        "file:packages/client/src/input.ts",
+        "file:packages/client/src/audio.ts",
+        "file:packages/client/index.html",
+        "file:packages/client/style.css",
+        "file:packages/client/src/ui/hud.ts",
+        "file:packages/client/src/ui/screens.ts",
+        "file:packages/client/src/ui/character.ts",
+        "file:packages/client/src/ui/craft.ts",
+        "file:packages/client/src/ui/inventory.ts"
+      ]
+    },
+    {
+      "id": "layer:build-configuration",
+      "name": "Build Configuration",
+      "description": "Build system configuration, TypeScript settings, package definitions, and development tooling for all packages",
+      "nodeIds": [
+        "config:package.json",
+        "config:packages/client/package.json",
+        "config:packages/client/tsconfig.json",
+        "config:packages/server/package.json",
+        "config:packages/server/tsconfig.json",
+        "config:packages/shared/package.json",
+        "config:packages/shared/tsconfig.json",
+        "file:packages/client/vite.config.ts",
+        "file:packages/shared/vitest.config.ts"
+      ]
+    },
+    {
+      "id": "layer:infrastructure",
+      "name": "Infrastructure",
+      "description": "Containerization, deployment orchestration, reverse proxy configuration, and deployment automation scripts",
+      "nodeIds": [
+        "service:Dockerfile",
+        "config:docker-compose.yml",
+        "config:Caddyfile",
+        "file:.env.example",
+        "file:scripts/deploy-vps.mjs",
+        "file:scripts/diag.mjs",
+        "file:scripts/fix-port.mjs"
+      ]
+    },
+    {
+      "id": "layer:testing",
+      "name": "Testing",
+      "description": "Test suite and test infrastructure for the shared simulation core, ensuring game mechanics are deterministic and reproducible",
+      "nodeIds": [
+        "file:packages/shared/test/smoke.test.ts",
+        "file:packages/shared/test/rng.test.ts"
+      ]
+    },
+    {
+      "id": "layer:documentation",
+      "name": "Documentation",
+      "description": "Project documentation, specifications, and development plans for architecture, design, and implementation phases",
+      "nodeIds": [
+        "document:README.md",
+        "document:CLAUDE.md",
+        "document:prompt.md",
+        "document:docs/superpowers/plans/2026-06-12-phase1-sim-core.md",
+        "document:docs/superpowers/plans/2026-06-13-phase0-survival-core.md",
+        "document:docs/superpowers/plans/2026-06-13-phase1-crafting.md",
+        "document:docs/superpowers/specs/2026-06-12-last-fortress-design.md",
+        "document:docs/superpowers/specs/2026-06-13-phase1-crafting-design.md",
+        "document:docs/superpowers/specs/2026-06-13-survival-conversion-design.md"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "Project Overview",
+      "description": "Start with README.md to understand Last Fortress's core concept: a browser-based multiplayer co-op survival tower defense game where players gather resources during the day and defend against zombie waves at night. This document outlines the three-package architecture (shared simulation, server, client) and explains the development setup.",
+      "nodeIds": [
+        "document:README.md"
+      ]
+    },
+    {
+      "order": 2,
+      "title": "Client Entry Point",
+      "description": "The client's main.ts orchestrates the entire player experience: initializing the WebSocket connection, setting up the Three.js rendering pipeline, binding keyboard/mouse input, and launching the HUD. This file shows how all client systems integrate into a single runtime loop.",
+      "nodeIds": [
+        "file:packages/client/src/main.ts"
+      ]
+    },
+    {
+      "order": 3,
+      "title": "Networking & Server Communication",
+      "description": "The net.ts module provides bidirectional WebSocket communication between client and server with automatic reconnection and message queuing. This is the lifeline that synchronizes the client's view with the authoritative server state at 20 Hz.",
+      "nodeIds": [
+        "file:packages/client/src/net.ts"
+      ]
+    },
+    {
+      "order": 4,
+      "title": "3D Rendering Pipeline",
+      "description": "Scene.ts initializes the Three.js environment with a tilted orthographic camera that creates the game's distinctive 2.5D perspective. It orchestrates the world renderer, procedural terrain, and all post-processing effects that make the game visually cohesive.",
+      "nodeIds": [
+        "file:packages/client/src/render/scene.ts"
+      ],
+      "languageLesson": "Three.js uses a scene graph: camera and lights define the view, while geometries and materials define what's rendered. Post-processing shaders apply effects by rendering the scene to a texture first, then applying filters before final display."
+    },
+    {
+      "order": 5,
+      "title": "World Rendering & Procedural Models",
+      "description": "World.ts manages entity meshes and building placement overlays, while models.ts generates procedural 3D geometry for every building, item, and character without pre-made art assets. Together they create the visual game world by transforming simulation state into Three.js meshes.",
+      "nodeIds": [
+        "file:packages/client/src/render/world.ts",
+        "file:packages/client/src/render/models.ts"
+      ]
+    },
+    {
+      "order": 6,
+      "title": "Terrain & Environmental Effects",
+      "description": "Environment.ts handles procedural terrain rendering, seasonal transitions, and dynamic environmental effects that reinforce the survival atmosphere. It generates terrain geometry and applies visual transitions based on game time progression.",
+      "nodeIds": [
+        "file:packages/client/src/render/environment.ts"
+      ]
+    },
+    {
+      "order": 7,
+      "title": "Player Input & Build System",
+      "description": "Input.ts translates keyboard and mouse events into game actions: movement, attacking, building placement. It provides real-time ghost preview of where buildings will be placed, connecting player intent to the simulation through the network.",
+      "nodeIds": [
+        "file:packages/client/src/input.ts"
+      ]
+    },
+    {
+      "order": 8,
+      "title": "Player Interface & HUD",
+      "description": "The HUD displays real-time health, resource counts, time-of-day, and the building palette. Character.ts shows the player's equipment and stats with a live 3D portrait. Craft.ts lists available recipes with material requirements. Together they form the game's information architecture.",
+      "nodeIds": [
+        "file:packages/client/src/ui/hud.ts",
+        "file:packages/client/src/ui/character.ts",
+        "file:packages/client/src/ui/craft.ts"
+      ]
+    },
+    {
+      "order": 9,
+      "title": "Shared Simulation Core",
+      "description": "The packages/shared/src/index.ts exports the deterministic game engine that runs on both client and server at 20 Hz. This is the source of truth for all game logic: entity state, collision, damage, crafting, and building placement. Both client and server run the same simulation code to keep them in sync.",
+      "nodeIds": [
+        "file:packages/shared/src/index.ts"
+      ],
+      "languageLesson": "TypeScript barrel files use 'export * from' to re-export modules, creating a clean public API. This is especially important in monorepos where packages need a single canonical entry point."
+    },
+    {
+      "order": 10,
+      "title": "Game Types & Entity Definitions",
+      "description": "Types.ts defines the data structures for all game entities: Player, Building, Item, Projectile, and others. These interfaces form the contract between the simulation, network protocol, and renderer. Every entity's state flows through these types.",
+      "nodeIds": [
+        "file:packages/shared/src/sim/types.ts"
+      ]
+    },
+    {
+      "order": 11,
+      "title": "Simulation Engine",
+      "description": "Sim.ts is the heart of the game: each tick updates player positions, handles combat, processes crafting, spawns enemies, and determines victory/defeat conditions. It orchestrates inventory, map generation, and all game mechanics in a deterministic order at 20 Hz.",
+      "nodeIds": [
+        "file:packages/shared/src/sim/sim.ts"
+      ]
+    },
+    {
+      "order": 12,
+      "title": "Game Content: Items & Recipes",
+      "description": "Items.ts defines the item registry with properties (weight, durability, craft requirements) that drive economy and progression. This is the game's balance data: what players can craft, what resources cost, and what equipment provides.",
+      "nodeIds": [
+        "file:packages/shared/src/sim/data/items.ts"
+      ]
+    },
+    {
+      "order": 13,
+      "title": "Inventory & Item Management",
+      "description": "Inventory.ts handles item stacks, weight/capacity constraints, and transfers between player and containers. It enforces the rules that prevent overstacking and ensure the economy remains balanced during multiplayer sessions.",
+      "nodeIds": [
+        "file:packages/shared/src/sim/inventory.ts"
+      ]
+    },
+    {
+      "order": 14,
+      "title": "Procedural World Generation",
+      "description": "Mapgen.ts seeds the procedural generation of biomes, terrain elevation, and resource placement using deterministic randomization. Every game session generates a unique but playable world that challenges players differently while maintaining survival mechanics.",
+      "nodeIds": [
+        "file:packages/shared/src/sim/mapgen.ts"
+      ]
+    },
+    {
+      "order": 15,
+      "title": "Server, Deployment & Monorepo Structure",
+      "description": "The server (packages/server/src) runs the authoritative simulation and manages lobbies, party codes, and per-room game loops. The Dockerfile packages the server into a production container. Package.json defines the npm monorepo workspaces that tie client, server, and shared into one cohesive project.",
+      "nodeIds": [
+        "file:packages/server/src/index.ts",
+        "service:Dockerfile",
+        "config:package.json"
+      ],
+      "languageLesson": "npm workspaces allow multiple packages to share dependencies in a monorepo, reducing duplication. Multi-stage Docker builds separate compilation (builder stage with dev dependencies) from runtime (final stage with minimal dependencies only), cutting image size by 50-80%."
+    }
+  ]
+}
