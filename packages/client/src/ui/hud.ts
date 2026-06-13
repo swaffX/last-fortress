@@ -13,7 +13,7 @@ const BUILD_ITEMS: { type: BuildingType; ico: string; name: string }[] = [
   { type: 'crafting_table', ico: '🛠', name: 'Table' },
 ];
 
-const ITEM_ICON: Record<ItemId, string> = { wood: '🪵', stone: '🧱', berry: '🫐' };
+const ITEM_ICON: Record<string, string> = { wood: '🪵', stone: '🧱', berry: '🫐' };
 
 function costStr(type: BuildingType): string {
   const c = BUILDINGS[type].cost;
