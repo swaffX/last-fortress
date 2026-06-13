@@ -41,8 +41,23 @@ function createWindow(): void {
   });
 
   // in dev, the Vite server may not be up yet — retry the load
-  win.webContents.on('did-fail-load', () => {
+  win.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    console.log(`[did-fail-load] ${code} ${desc} ${url}`);
     if (DEV) setTimeout(() => win?.loadURL(DEV_URL), 800);
+  });
+
+  // forward renderer console + crashes to the main process stdout — otherwise
+  // they live only in detached DevTools and can't be tailed from the terminal
+  win.webContents.on('console-message', (_e, level, message, line, sourceId) => {
+    const tag = ['V', 'I', 'W', 'E'][level] ?? String(level);
+    const src = sourceId ? sourceId.split(/[\\/]/).pop() : '';
+    console.log(`[renderer ${tag}] ${message}${src ? `  (${src}:${line})` : ''}`);
+  });
+  win.webContents.on('render-process-gone', (_e, details) => {
+    console.log(`[renderer GONE] reason=${details.reason} exitCode=${details.exitCode}`);
+  });
+  win.webContents.on('preload-error', (_e, preloadPath, error) => {
+    console.log(`[preload ERROR] ${preloadPath}: ${error.message}`);
   });
 
   win.on('closed', () => { win = null; });
