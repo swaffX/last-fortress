@@ -153,7 +153,7 @@ export function createCharacterUI(root: HTMLElement): CharacterUI {
     chip.onclick = () => {
       cat = chip.dataset.c as Cat;
       for (const c of root.querySelectorAll('.ch-chip')) c.classList.toggle('on', c === chip);
-      renderCraft();
+      buildCraft();
     };
   }
 
@@ -196,28 +196,42 @@ export function createCharacterUI(root: HTMLElement): CharacterUI {
     }
   }
 
-  function renderCraft(): void {
-    tableHint.textContent = nearTable ? '🛠 workbench in reach' : 'basics by hand';
+  /** Build the card buttons once per category change (NOT every frame — clicks need stable nodes). */
+  function buildCraft(): void {
     const recipes = RECIPES.filter(r => cat === 'all' || recipeCat(r) === cat);
     const builds = (cat === 'all' || cat === 'build') ? BUILD : [];
     const rows: string[] = [];
     for (const r of recipes) {
-      const ok = canCraft(r);
-      rows.push(`<button class="ch-card${ok ? '' : ' locked'}" data-craft="${r.id}">
+      rows.push(`<button class="ch-card" data-craft="${r.id}">
         <span class="ch-tile">${ICON[r.output.item] ?? '▪'}</span>
         <span class="ch-cnm">${ITEMS[r.output.item].name}${r.output.count > 1 ? `<em> ×${r.output.count}</em>` : ''}${r.requiresTable ? ' <small>🛠</small>' : ''}</span>
-        <span class="ch-pills">${pills(r.inputs)}</span></button>`);
+        <span class="ch-pills"></span></button>`);
     }
     for (const b of builds) {
-      const cost = (Object.entries(BUILDINGS[b.type].cost) as [ItemId, number][]).map(([k, v]) => ({ item: k, count: v }));
-      const ok = canBuild(b.type);
-      rows.push(`<button class="ch-card build${ok ? '' : ' locked'}" data-build="${b.type}">
+      rows.push(`<button class="ch-card build" data-build="${b.type}">
         <span class="ch-tile">${b.ico}</span><span class="ch-cnm">${b.name} <small>place</small></span>
-        <span class="ch-pills">${pills(cost)}</span></button>`);
+        <span class="ch-pills"></span></button>`);
     }
     craftEl.innerHTML = rows.join('') || '<div class="ch-empty">No recipes here.</div>';
     for (const el of craftEl.querySelectorAll<HTMLElement>('[data-craft]')) el.onclick = () => api.onCraft(el.dataset.craft!);
     for (const el of craftEl.querySelectorAll<HTMLElement>('[data-build]')) el.onclick = () => { api.onPlace(el.dataset.build as BuildingType); api.toggle(false); };
+    refreshCraft();
+  }
+
+  /** Per-frame: only update affordability classes + cost pills (keeps buttons + listeners alive). */
+  function refreshCraft(): void {
+    tableHint.textContent = nearTable ? '🛠 workbench in reach' : 'basics by hand';
+    for (const el of craftEl.querySelectorAll<HTMLElement>('[data-craft]')) {
+      const r = RECIPES.find(x => x.id === el.dataset.craft); if (!r) continue;
+      el.classList.toggle('locked', !canCraft(r));
+      const p = el.querySelector('.ch-pills'); if (p) p.innerHTML = pills(r.inputs);
+    }
+    for (const el of craftEl.querySelectorAll<HTMLElement>('[data-build]')) {
+      const type = el.dataset.build as BuildingType;
+      el.classList.toggle('locked', !canBuild(type));
+      const cost = (Object.entries(BUILDINGS[type].cost) as [ItemId, number][]).map(([k, v]) => ({ item: k, count: v }));
+      const p = el.querySelector('.ch-pills'); if (p) p.innerHTML = pills(cost);
+    }
   }
 
   function setEq(slot: string, name: string | null): void {
@@ -242,7 +256,7 @@ export function createCharacterUI(root: HTMLElement): CharacterUI {
   }
 
   function render(): void {
-    renderInv(); renderCraft(); renderRight();
+    renderInv(); refreshCraft(); renderRight();
     const held = self?.inventory[self.hand];
     setEq('hand', held ? ITEMS[held.item].name : null);
     for (const s of ['head', 'body', 'legs'] as const) {
@@ -266,7 +280,7 @@ export function createCharacterUI(root: HTMLElement): CharacterUI {
     toggle(o?: boolean) {
       const next = o ?? !open; if (next === open) return; open = next;
       root.classList.toggle('hidden', !open);
-      if (open) { render(); requestAnimationFrame(() => portrait.start()); } else portrait.stop();
+      if (open) { buildCraft(); render(); requestAnimationFrame(() => portrait.start()); } else portrait.stop();
     },
     isOpen() { return open; },
     onCraft: () => {}, onPlace: () => {}, onRepair: () => {},
