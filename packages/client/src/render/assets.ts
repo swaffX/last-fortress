@@ -22,10 +22,10 @@ interface LoadedAsset {
 
 /** logical name → file + import tuning. Missing files are silently skipped. */
 const MANIFEST: Record<string, { url: string; scale?: number; yaw?: number; yOffset?: number }> = {
-  // nature (Quaternius Ultimate Stylized Nature — .gltf with relative .bin/textures)
-  tree: { url: '/models/nature/MapleTree_1.gltf', scale: 0.75 },        // ~5u tall
+  // nature (Quaternius Ultimate Stylized Nature, repacked to self-contained GLB)
+  tree: { url: '/models/tree.glb', scale: 0.75 },                       // ~5u tall
   rock: { url: '/models/rock.glb', scale: 1 },                          // (no asset → procedural)
-  bush: { url: '/models/nature/Bush_Large.gltf', scale: 0.41, yOffset: 0.34 }, // ~1u, origin below feet
+  bush: { url: '/models/bush.glb', scale: 0.41, yOffset: 0.34 },        // ~1u, origin below feet
   // animals (Quaternius CC0 packs; scale measured from each GLB's world bbox)
   creature_cow: { url: '/models/cow.glb', scale: 0.29 },     // ~1.5u tall
   creature_sheep: { url: '/models/sheep.glb', scale: 0.25 }, // ~1.1u
