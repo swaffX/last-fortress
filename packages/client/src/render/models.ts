@@ -353,41 +353,6 @@ export function toolModel(kind: 'axe' | 'pick'): THREE.Group {
  * Three tree species with per-instance hue jitter so forests read as organic.
  * variant: 0 = pine, 1 = oak (blobby crown), 2 = tall fir.
  */
-/** In-flight projectile meshes — oriented along +Z by the heading system. */
-export function projectileModel(kind: 'arrow' | 'bolt' | 'spit' | 'bomb'): THREE.Group {
-  switch (kind) {
-    case 'arrow': {
-      const shaft = box(0.035, 0.035, 0.55, 0x8a6238, 0);
-      const head = cone(0.04, 0.12, 0x9aa3ab, 0, 4);
-      head.rotation.x = Math.PI / 2;
-      head.position.z = 0.32;
-      const fletch = box(0.09, 0.02, 0.1, 0xd8d0c0, 0);
-      fletch.position.z = -0.24;
-      return group(shaft, head, fletch);
-    }
-    case 'bolt': {
-      const shaft = box(0.05, 0.05, 0.42, 0x4a4038, 0);
-      const head = cone(0.05, 0.12, 0xc9d2da, 0, 4);
-      head.rotation.x = Math.PI / 2;
-      head.position.z = 0.26;
-      return group(shaft, head);
-    }
-    case 'spit': {
-      const blob = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), mat(0x8fdc4a, 0x8fdc4a));
-      blob.scale.z = 1.4;
-      return group(blob);
-    }
-    case 'bomb': {
-      const shell = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), mat(0x2b2b30));
-      const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 4), mat(0xb8742a));
-      fuse.position.y = 0.2;
-      const spark = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 3), mat(0xffaa33, 0xff8c3b));
-      spark.position.y = 0.27;
-      return group(shell, fuse, spark);
-    }
-  }
-}
-
 export function treeModel(variant = 0, jitter = 0): THREE.Group {
   const leafColor = new THREE.Color(LEAF).offsetHSL(jitter * 0.06 - 0.03, jitter * 0.15 - 0.05, jitter * 0.1 - 0.05).getHex();
   const leafColor2 = new THREE.Color(0x4a8a3d).offsetHSL(jitter * 0.05 - 0.025, 0, jitter * 0.08 - 0.04).getHex();
@@ -481,7 +446,140 @@ const ITEM_COLOR: Record<string, number> = {
   crafting_table: 0x7a5230, wood_axe: 0x9c6b35, stone_axe: 0x8d9299,
   wood_pick: 0x9c6b35, stone_pick: 0x8d9299, wood_sword: 0xb08a55,
   stone_sword: 0x9aa3ab, wood_spear: 0xb08a55,
+  raw_meat: 0xb5564a, leather: 0x8a5a32, wool: 0xe8e2d4, silk: 0xd8e0e8,
+  pelt: 0x6a5a48, feather: 0xe0d8c8, hide: 0x9a7048, bone: 0xe8e2cc, venom: 0x7ed040,
+  katana: 0xcfd6de, war_spear: 0x9aa3ab, mage_staff: 0xb060ff,
 };
+
+// ---- creatures ----
+const FACTION_RING: Record<string, number> = {
+  animal: 0x8aa84f, bandit: 0xe08a3a, zombie: 0x6f8f57, boss: 0xc43a31,
+};
+
+/** quadruped: box body + 4 legs + head; userData.legs/body for the walk animator. */
+function quadruped(bodyCol: number, headCol: number, opts: { big?: boolean; tail?: boolean } = {}): THREE.Group {
+  const s = opts.big ? 1.25 : 1;
+  const body = box(0.9 * s, 0.5 * s, 0.5 * s, bodyCol, 0.6 * s);
+  const head = box(0.4 * s, 0.4 * s, 0.4 * s, headCol, 0.7 * s);
+  head.position.z = 0.6 * s;
+  const legs: THREE.Mesh[] = [];
+  for (const [x, z] of [[-0.28, 0.28], [0.28, 0.28], [-0.28, -0.28], [0.28, -0.28]] as const) {
+    const leg = box(0.13 * s, 0.45 * s, 0.13 * s, headCol, 0.22 * s);
+    leg.position.set(x * s, 0, z * s);
+    legs.push(leg);
+  }
+  const parts: THREE.Object3D[] = [body, head, ...legs];
+  if (opts.tail) parts.push(at(box(0.1, 0.1, 0.4, bodyCol), 0, 0.6 * s, -0.55 * s));
+  const g = group(...parts);
+  g.userData.legs = legs; g.userData.body = body; g.userData.head = head;
+  return g;
+}
+
+function spiderModel(col: number): THREE.Group {
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 6), mat(col));
+  body.position.y = 0.4; body.scale.y = 0.7;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 7, 5), mat(col));
+  head.position.set(0, 0.4, 0.4);
+  const legs: THREE.Mesh[] = [];
+  for (let i = 0; i < 8; i++) {
+    const side = i < 4 ? -1 : 1;
+    const leg = box(0.05, 0.05, 0.6, col, 0.4);
+    leg.position.set(side * 0.35, 0.4, (i % 4 - 1.5) * 0.18);
+    leg.rotation.z = side * 0.6;
+    legs.push(leg);
+  }
+  for (const ex of [-0.08, 0.08]) head.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 3), mat(0xff3322, 0xff3322)), ex, 0.05, 0.18));
+  const g = group(body, head, ...legs);
+  g.userData.legs = legs.slice(0, 4); g.userData.body = body;
+  return g;
+}
+
+function snakeModel(col: number): THREE.Group {
+  const segs: THREE.Mesh[] = [];
+  for (let i = 0; i < 5; i++) {
+    const seg = new THREE.Mesh(new THREE.SphereGeometry(0.18 - i * 0.02, 7, 5), mat(col));
+    seg.position.set(0, 0.18, -i * 0.28);
+    segs.push(seg);
+  }
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 5), mat(col));
+  head.position.set(0, 0.2, 0.3); head.scale.z = 1.3;
+  const g = group(head, ...segs);
+  g.userData.body = head; g.userData.legs = [];
+  return g;
+}
+
+function humanoidTinted(armor: number, weapon: 'sword' | 'staff' | 'spear' | 'none'): THREE.Group {
+  const g = playerModel();
+  // retint body/head-ish parts
+  const body = g.userData.body as THREE.Mesh | undefined;
+  if (body) (body.material as THREE.MeshLambertMaterial).color.setHex(armor);
+  const arms = g.userData.arms as THREE.Mesh[] | undefined;
+  if (arms && weapon !== 'none') {
+    const w = weapon === 'staff' ? box(0.06, 1.1, 0.06, 0x6a4a2a, -0.5)
+      : weapon === 'spear' ? box(0.05, 1.3, 0.05, 0x8a6238, -0.6)
+      : box(0.08, 0.7, 0.05, 0xcfd6de, -0.35);
+    arms[1]!.add(w);
+    if (weapon === 'staff') w.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), mat(0xb060ff, 0xb060ff)), 0, -1.05, 0));
+  }
+  return g;
+}
+
+function zombieModel(col: number, scale: number): THREE.Group {
+  const body = box(0.56, 0.82, 0.4, col, 0.72);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), mat(0x9fce6a));
+  head.position.y = 1.36;
+  for (const ex of [-0.1, 0.1]) head.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.02), mat(0xff2a1a, 0xff2a1a)), ex, 0.05, 0.22));
+  const legL = box(0.18, 0.55, 0.18, col, -0.26); legL.position.set(-0.16, 0.55, 0);
+  const legR = box(0.18, 0.55, 0.18, col, -0.26); legR.position.set(0.16, 0.55, 0);
+  const armL = box(0.16, 0.6, 0.16, col, -0.25); armL.position.set(-0.42, 1.15, 0.1); armL.rotation.x = -1.2;
+  const armR = box(0.16, 0.6, 0.16, col, -0.25); armR.position.set(0.42, 1.15, 0.1); armR.rotation.x = -1.2;
+  const g = group(body, head, legL, legR, armL, armR);
+  g.scale.setScalar(scale);
+  g.userData.legs = [legL, legR]; g.userData.arms = [armL, armR]; g.userData.body = body; g.userData.head = head;
+  return g;
+}
+
+export function creatureModel(species: string): THREE.Group {
+  let g: THREE.Group;
+  switch (species) {
+    case 'cow': g = quadruped(0x6b5640, 0xe8e2d4, { big: true, tail: true }); break;
+    case 'sheep': g = quadruped(0xe8e2d4, 0xcfc6b4, { tail: true }); break;
+    case 'pig': g = quadruped(0xd99a9a, 0xc78a8a, { tail: true }); break;
+    case 'boar': g = quadruped(0x5a4a3a, 0x4a3a2a, { tail: true }); break;
+    case 'wolf': g = quadruped(0x6a6f78, 0x565b64, { tail: true }); break;
+    case 'bear': g = quadruped(0x4a3a2a, 0x3a2c1e, { big: true }); break;
+    case 'chicken': g = quadruped(0xf0ead8, 0xe0a040, {}); g.scale.setScalar(0.7); break;
+    case 'rabbit': g = quadruped(0xcfc6b4, 0xe8e2d4, { tail: true }); g.scale.setScalar(0.6); break;
+    case 'spider': g = spiderModel(0x2a2a32); break;
+    case 'snake': g = snakeModel(0x4a7a3a); break;
+    case 'bandit_sword': g = humanoidTinted(0x4a3a52, 'sword'); break;
+    case 'bandit_dagger': g = humanoidTinted(0x3a3a42, 'sword'); break;
+    case 'bandit_spear': g = humanoidTinted(0x52423a, 'spear'); break;
+    case 'bandit_mage': g = humanoidTinted(0x3a2a52, 'staff'); break;
+    case 'zombie': g = zombieModel(0x6f8f57, 1.2); break;
+    case 'zombie_fast': g = zombieModel(0x8fae5a, 1.0); break;
+    case 'zombie_brute': g = zombieModel(0x4f6b45, 1.7); break;
+    case 'warlock': g = humanoidTinted(0x2a1a42, 'staff'); g.scale.setScalar(1.6); break;
+    case 'butcher': g = zombieModel(0x5d4a4a, 2.0); { const blade = box(0.2, 1.2, 0.45, 0x9aa3ab, 0.2); (g.userData.arms as THREE.Mesh[])[1]!.add(blade); } break;
+    case 'spider_queen': g = spiderModel(0x3a1a2a); g.scale.setScalar(2.0); break;
+    default: g = quadruped(0x888888, 0x666666, {});
+  }
+  return g;
+}
+
+export function projectileModel(kind: 'spit' | 'bolt'): THREE.Group {
+  if (kind === 'spit') {
+    const blob = new THREE.Mesh(new THREE.SphereGeometry(0.16, 7, 5), mat(0x8fdc4a, 0x8fdc4a));
+    blob.scale.z = 1.4;
+    return group(blob);
+  }
+  const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), mat(0xb060ff, 0xb060ff));
+  shard.scale.z = 1.6;
+  return group(shard);
+}
+
+/** Ground ring color per faction (drawn by world.ts under creatures). */
+export function factionRingColor(faction: string): number { return FACTION_RING[faction] ?? 0x888888; }
 
 /** Small bobbing pickup on the ground. */
 export function itemModel(item: string): THREE.Group {
