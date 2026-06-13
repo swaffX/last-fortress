@@ -3,7 +3,11 @@ import type { PlayerView } from '../net';
 
 type Equipment = PlayerView['equipment'];
 
-const ITEM_ICON: Record<string, string> = { wood: '🪵', stone: '🧱', berry: '🫐' };
+const ITEM_ICON: Record<string, string> = {
+  wood: '🪵', stone: '🧱', berry: '🫐', stick: '🪵', crafting_table: '🛠',
+  wood_axe: '🪓', stone_axe: '🪓', wood_pick: '⛏', stone_pick: '⛏',
+  wood_sword: '🗡', stone_sword: '⚔️', wood_spear: '🔱',
+};
 
 export interface InventoryUI {
   setData(inventory: Slot[], equipment: Equipment, hand: number): void;
@@ -17,7 +21,11 @@ export interface InventoryUI {
 function slotHtml(s: Slot): string {
   if (!s) return '';
   const ico = ITEM_ICON[s.item] ?? '▪';
-  return `<span class="it-ico">${ico}</span><span class="it-n">${s.count > 1 ? s.count : ''}</span>`;
+  const max = ITEMS[s.item].durabilityMax;
+  const bar = (max && s.dur !== undefined)
+    ? `<span class="dur"><span class="dur-fill" style="width:${Math.max(0, (s.dur / max) * 100)}%"></span></span>`
+    : '';
+  return `<span class="it-ico">${ico}</span><span class="it-n">${s.count > 1 ? s.count : ''}</span>${bar}`;
 }
 
 export function createInventoryUI(hotbarRoot: HTMLElement, backpackRoot: HTMLElement): InventoryUI {
@@ -69,6 +77,7 @@ export function createInventoryUI(hotbarRoot: HTMLElement, backpackRoot: HTMLEle
       const s = inv[i] ?? null;
       el.querySelector('.it-ico')?.remove();
       el.querySelector('.it-n')?.remove();
+      el.querySelector('.dur')?.remove();
       if (s) el.insertAdjacentHTML('beforeend', slotHtml(s));
     }
     if (open) {

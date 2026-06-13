@@ -143,10 +143,34 @@ button { font-family: inherit; cursor: pointer; }
 #hud > * { pointer-events: none; }
 #hud .hotbar, #hud .hotbar *,
 #hud .backpack, #hud .backpack *,
+#hud .craft-panel, #hud .craft-panel *,
 #hud .build-menu, #hud .build-menu *,
 #hud .sel-panel .btn,
 #hud .chat-input,
 #hud .overlay, #hud .overlay * { pointer-events: auto; }
+
+.craft-panel {
+  position: absolute; right: 14px; top: 120px; width: 250px;
+  background: rgba(13,20,32,0.94); border: 1px solid var(--night-3);
+  clip-path: var(--chamfer); padding: 12px; backdrop-filter: blur(8px);
+}
+.craft-panel .cp-title { color: var(--parchment); font-weight: 700; text-align: center;
+  letter-spacing: 0.05em; margin-bottom: 8px; }
+.craft-panel .cp-repair { width: 100%; margin-bottom: 8px; }
+.craft-panel .cp-list { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow-y: auto; }
+.cp-row { display: grid; grid-template-columns: 24px 1fr auto auto; gap: 6px; align-items: center;
+  background: rgba(7,11,18,0.6); border: 1px solid var(--night-3); border-radius: 5px;
+  padding: 5px 8px; cursor: pointer; color: var(--parchment); text-align: left; }
+.cp-row:hover { border-color: var(--gold); }
+.cp-row .cp-ico { font-size: 17px; }
+.cp-row .cp-nm { font-size: 12px; }
+.cp-row .cp-cost { font-size: 11px; color: var(--steel); }
+.cp-row .cp-badge { font-size: 11px; opacity: 0; }
+.cp-row.needs-table .cp-badge { opacity: 0.9; }
+.cp-row.poor { opacity: 0.4; }
+.slot .dur { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 3px;
+  background: rgba(0,0,0,0.6); border-radius: 2px; overflow: hidden; }
+.slot .dur-fill { display: block; height: 100%; background: linear-gradient(90deg,#c43a31,#6fbf63); }
 
 /* ---- survival HUD ---- */
 .vitals {

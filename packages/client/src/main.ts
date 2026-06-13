@@ -10,6 +10,7 @@ import { Audio } from './audio';
 import { Hud } from './ui/hud';
 import { Screens } from './ui/screens';
 import { createInventoryUI } from './ui/inventory';
+import { createCraftUI } from './ui/craft';
 import { Input } from './input';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -21,6 +22,7 @@ const hud = new Hud();
 const screens = new Screens();
 const inventory = createInventoryUI(
   document.getElementById('hotbar-slot')!, document.getElementById('backpack-slot')!);
+const craft = createCraftUI(document.getElementById('craft-slot')!);
 const input = new Input(stage, canvas);
 const net = new Net();
 
@@ -49,6 +51,8 @@ hud.onDemolish = id => {
 inventory.onMove = (from, to) => net.send({ t: 'cmd', cmd: { kind: 'move_item', from, to } });
 inventory.onDrop = (slot, count) => net.send({ t: 'cmd', cmd: { kind: 'drop_item', slot, count } });
 inventory.onSelectHand = slot => net.send({ t: 'cmd', cmd: { kind: 'select_hand', slot } });
+craft.onCraft = recipeId => net.send({ t: 'cmd', cmd: { kind: 'craft', recipeId } });
+craft.onRepair = () => net.send({ t: 'cmd', cmd: { kind: 'repair_hand' } });
 input.send = cmd => net.send({ t: 'cmd', cmd });
 input.ping = pos => net.send({ t: 'ping', pos });
 input.onBuildCancel = () => hud.clearBuild();
@@ -123,6 +127,8 @@ net.on((msg: ServerMsg) => {
           hud.removeMinimapNode(e.nodeId);
           nodeProgress.delete(e.nodeId);
         }
+        if (e.kind === 'craft') hud.notify(`Crafted ${e.item.replace(/_/g, ' ')}`);
+        if (e.kind === 'tool_broke' && e.playerId === selfId) hud.notify(`💥 ${e.item.replace(/_/g, ' ')} broke!`);
         if (e.kind === 'region_enter' && e.id === selfId) hud.regionToast(e.region);
         if (e.kind === 'player_respawn' && e.id === selfId) hud.banner('You respawn at camp');
         if (e.kind === 'phase_change') {
@@ -137,7 +143,12 @@ net.on((msg: ServerMsg) => {
       stage.setGameTick(msg.tick);
       hud.updateFrame(selfView, msg.players, msg.buildings, msg.phase, msg.phaseTicks, selfId);
       hud.handleEvents(msg.events, project);
-      if (selfView) inventory.setData(selfView.inventory, selfView.equipment, selfView.hand);
+      if (selfView) {
+        inventory.setData(selfView.inventory, selfView.equipment, selfView.hand);
+        const nearTable = msg.buildings.some(b => b.type === 'crafting_table'
+          && Math.hypot(b.pos.x + 0.5 - selfView!.pos.x, b.pos.y + 0.5 - selfView!.pos.y) <= 3.5);
+        craft.setContext(selfView, nearTable);
+      }
       break;
     }
     case 'ping':
@@ -212,10 +223,11 @@ addEventListener('keydown', e => {
     else net.send({ t: 'cmd', cmd: { kind: 'eat' } });
   }
   if (k === 'i') inventory.toggle();
+  if (k === 'c') craft.toggle();
   if (k === 'b') hud.toggleBuildMenu();
   if (k === 'q') net.send({ t: 'cmd', cmd: { kind: 'eat' } });   // quick-eat
   if (e.key >= '1' && e.key <= '9') net.send({ t: 'cmd', cmd: { kind: 'select_hand', slot: Number(e.key) - 1 } });
-  if (e.key === 'Escape') { hud.clearBuild(); hud.selectBuilding(null); hud.toggleBuildMenu(false); inventory.toggle(false); }
+  if (e.key === 'Escape') { hud.clearBuild(); hud.selectBuilding(null); hud.toggleBuildMenu(false); inventory.toggle(false); craft.toggle(false); }
   if (k === 'k' && profile) screens.skillTree(profile, true);
 });
 

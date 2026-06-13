@@ -186,6 +186,15 @@ export function buildingModel(type: BuildingType, tier: number): THREE.Group {
       }
       return group(box(0.9, 0.1, 0.9, WOOD, 0.05), g);
     }
+    case 'crafting_table': {
+      const top = box(0.92, 0.18, 0.92, WOOD, 0.78);
+      const legs = new THREE.Group();
+      for (const [x, z] of [[-0.36, -0.36], [0.36, -0.36], [-0.36, 0.36], [0.36, 0.36]] as const)
+        legs.add(at(box(0.1, 0.7, 0.1, WOOD_DARK, 0.35), x, 0, z));
+      const g = group(top, legs);
+      g.add(at(box(0.3, 0.06, 0.18, IRON, 0.9), 0.1, 0, 0.1));   // a saw on the bench
+      return g;
+    }
   }
 }
 
@@ -468,7 +477,10 @@ export function bushModel(): THREE.Group {
 }
 
 const ITEM_COLOR: Record<string, number> = {
-  wood: 0x9c6b35, stone: 0x8d9299, berry: 0xc23a4a,
+  wood: 0x9c6b35, stone: 0x8d9299, berry: 0xc23a4a, stick: 0xb08a55,
+  crafting_table: 0x7a5230, wood_axe: 0x9c6b35, stone_axe: 0x8d9299,
+  wood_pick: 0x9c6b35, stone_pick: 0x8d9299, wood_sword: 0xb08a55,
+  stone_sword: 0x9aa3ab, wood_spear: 0xb08a55,
 };
 
 /** Small bobbing pickup on the ground. */
@@ -477,6 +489,9 @@ export function itemModel(item: string): THREE.Group {
   let mesh: THREE.Mesh;
   if (item === 'berry') mesh = new THREE.Mesh(new THREE.SphereGeometry(0.16, 7, 6), mat(color, color));
   else if (item === 'stone') mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18), mat(color));
+  else if (item === 'crafting_table') mesh = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.22, 0.32), mat(color));
+  else if (item.endsWith('_sword') || item === 'wood_spear') mesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.4, 0.06), mat(color));
+  else if (item.includes('axe') || item.includes('pick')) mesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.06), mat(color));
   else mesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.18, 0.18), mat(color));
   mesh.position.y = 0.3;
   const g = group(mesh);

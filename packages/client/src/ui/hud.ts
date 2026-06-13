@@ -10,6 +10,7 @@ const BUILD_ITEMS: { type: BuildingType; ico: string; name: string }[] = [
   { type: 'stone_wall', ico: '🧱', name: 'S.Wall' },
   { type: 'gate', ico: '🚪', name: 'Gate' },
   { type: 'spike', ico: '🗡', name: 'Spikes' },
+  { type: 'crafting_table', ico: '🛠', name: 'Table' },
 ];
 
 const ITEM_ICON: Record<ItemId, string> = { wood: '🪵', stone: '🧱', berry: '🫐' };
@@ -45,6 +46,7 @@ export class Hud {
       <div class="party-panel" id="party-panel"></div>
       <div id="hotbar-slot"></div>
       <div id="backpack-slot"></div>
+      <div id="craft-slot"></div>
       <div class="build-menu hidden" id="build-menu">
         <div class="bm-title">Construction</div>
         <div class="bm-grid" id="bm-grid"></div>
