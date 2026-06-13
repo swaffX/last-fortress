@@ -8,6 +8,8 @@ export {
   addItem, removeItem, countItem, firstEmpty, moveSlot, emptyInventory, giveItem,
 } from './sim/inventory';
 export { RECIPES, recipeById, type Recipe } from './sim/data/recipes';
+export { CREATURES, creatureDef, type CreatureDef, type LootEntry, type Faction, type Behavior } from './sim/data/creatures';
+export { spawnPlan, BIOME_DANGER, POOLS, type Danger, type SpawnTarget } from './sim/data/spawning';
 export { generateRegions, regionAt, type Region, type RegionMap, type Biome } from './sim/regions';
 export * from './sim/types';
 export * from './sim/constants';
