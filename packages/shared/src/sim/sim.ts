@@ -93,7 +93,14 @@ export class Sim {
     sim.state.groundItems = state.groundItems;
     sim.grid.reset();
     for (const n of sim.state.nodes.values()) if (n.amount > 0) sim.grid.occupy(n.pos, 1, n.id);
-    for (const b of sim.state.buildings.values()) sim.grid.occupy(b.pos, BUILDINGS[b.type].size, b.id);
+    // A persisted world from an older schema may hold building types this build
+    // no longer knows (the TD->survival conversion removed towers). Drop them
+    // instead of crashing on an undefined def.
+    for (const [id, b] of [...sim.state.buildings]) {
+      const def = BUILDINGS[b.type];
+      if (!def) { sim.state.buildings.delete(id); continue; }
+      sim.grid.occupy(b.pos, def.size, b.id);
+    }
     return sim;
   }
 
@@ -445,7 +452,7 @@ export class Sim {
     const id = this.grid.occupantAt(pos);
     if (id === 0) return false;
     const b = this.state.buildings.get(id);
-    if (b) return !BUILDINGS[b.type].walkable;
+    if (b) { const def = BUILDINGS[b.type]; return def ? !def.walkable : false; }
     const n = this.state.nodes.get(id);
     return n ? n.amount > 0 : false;
   }
