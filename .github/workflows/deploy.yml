@@ -1,0 +1,39 @@
+name: Deploy to VDS
+
+# Deploys every push to main onto the VDS: the runner SSHes in and runs
+# `git reset --hard origin/main` + `docker compose up -d --build` (see
+# scripts/deploy-vps.mjs). Manual re-deploy via the Actions "Run workflow" button.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two deploys touch the box at once; let an in-flight deploy finish.
+concurrency:
+  group: deploy-vds
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The deploy script's only runtime dep. Installed standalone to keep the
+      # job fast (no workspace install needed — the VDS builds from source).
+      - name: Install ssh2
+        run: npm install ssh2@^1.17.0 --no-save
+
+      - name: Deploy over SSH
+        env:
+          VPS_HOST: 212.180.120.69
+          VPS_USER: root
+          VPS_PASS: ${{ secrets.VPS_PASS }}   # masked in logs
+        run: node scripts/deploy-vps.mjs
