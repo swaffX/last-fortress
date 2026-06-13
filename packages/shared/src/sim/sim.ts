@@ -597,29 +597,37 @@ export class Sim {
           }
         } else step(p.pos.x, p.pos.y, speed);
       };
+      // smooth continuous amble (every tick, not bursty) with occasional graze pauses
+      const doWander = () => {
+        if (c.wanderDir.x !== 0 || c.wanderDir.y !== 0) {
+          step(c.pos.x + c.wanderDir.x, c.pos.y + c.wanderDir.y, speed * 0.35);
+        }
+        if (this.rng.next() < 0.012) {
+          c.wanderDir = this.rng.next() < 0.4
+            ? { x: 0, y: 0 }                                                   // graze / stand
+            : { x: this.rng.next() * 2 - 1, y: this.rng.next() * 2 - 1 };      // wander off
+        }
+      };
 
       switch (def.behavior) {
         case 'flee': {
           const threat = this.nearestPlayer(c.pos, def.aggroRange);
           if (threat && (c.fleeTicks > 0 || dist(threat.pos, c.pos) < def.aggroRange)) {
             step(c.pos.x * 2 - threat.pos.x, c.pos.y * 2 - threat.pos.y, speed * 1.1);
-          } else if (this.state.tick % 4 === 0) {
-            step(c.pos.x + c.wanderDir.x, c.pos.y + c.wanderDir.y, speed * 0.4);
-            if (this.rng.next() < 0.02) c.wanderDir = { x: this.rng.next() * 2 - 1, y: this.rng.next() * 2 - 1 };
-          }
+          } else doWander();
           break;
         }
         case 'neutral': {
           const t = c.provoked ? this.nearestPlayer(c.pos, def.aggroRange + 4) : null;
           if (t) engage(t);
-          else if (this.state.tick % 4 === 0) step(c.pos.x + c.wanderDir.x, c.pos.y + c.wanderDir.y, speed * 0.4);
+          else doWander();
           break;
         }
         case 'aggressive':
         case 'pack': {
           const t = this.nearestPlayer(c.pos, def.aggroRange);
           if (t) engage(t);
-          else if (this.state.tick % 4 === 0) step(c.pos.x + c.wanderDir.x, c.pos.y + c.wanderDir.y, speed * 0.4);
+          else doWander();
           break;
         }
         case 'march': {
