@@ -427,15 +427,28 @@ export class World {
       best.attackT = 1;
     }
 
-    // slash arc laid flat on the ground, centred in front of the player along dir
-    const cx = (best ? best.obj.position.x : pos.x) + dx * 0.9;
-    const cz = (best ? best.obj.position.z : pos.y) + dy * 0.9;
-    const arc = new THREE.Mesh(
-      new THREE.RingGeometry(0.7, 1.5, 16, 1, Math.PI / 2 - 0.9, 1.8),
-      new THREE.MeshBasicMaterial({ color: 0xeef2ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
-    arc.rotation.x = -Math.PI / 2;
-    arc.rotation.z = -heading;           // align the cone's centre with the aim heading
-    arc.position.set(cx, 1.0, cz);
+    // slash ribbon built directly from the aim vector (no rotation guesswork):
+    // forward(h) = (sin h, cos h) matches the heading convention used everywhere.
+    const ox = best ? best.obj.position.x : pos.x;
+    const oz = best ? best.obj.position.z : pos.y;
+    const SPREAD = 1.0, INNER = 0.7, OUTER = 1.7, SEG = 10, Y = 1.0;
+    const verts: number[] = [];
+    for (let i = 0; i <= SEG; i++) {
+      const a = heading - SPREAD + (2 * SPREAD) * (i / SEG);
+      const fx = Math.sin(a), fz = Math.cos(a);
+      verts.push(ox + fx * INNER, Y, oz + fz * INNER);
+      verts.push(ox + fx * OUTER, Y, oz + fz * OUTER);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    const idx: number[] = [];
+    for (let i = 0; i < SEG; i++) {
+      const a0 = i * 2, b0 = i * 2 + 1, a1 = i * 2 + 2, b1 = i * 2 + 3;
+      idx.push(a0, b0, a1, b0, b1, a1);
+    }
+    geo.setIndex(idx);
+    const arc = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color: 0xeef2ff, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
     this.scene.add(arc);
     this.slashes.push({ mesh: arc, t: 1 });
   }
@@ -524,10 +537,9 @@ export class World {
     // weapon slash arcs fade + expand
     for (let i = this.slashes.length - 1; i >= 0; i--) {
       const s = this.slashes[i]!;
-      s.t -= dt * 4;
-      if (s.t <= 0) { this.scene.remove(s.mesh); this.slashes.splice(i, 1); continue; }
-      s.mesh.scale.setScalar(1 + (1 - s.t) * 0.4);
-      (s.mesh.material as THREE.MeshBasicMaterial).opacity = s.t * 0.85;
+      s.t -= dt * 5;
+      if (s.t <= 0) { this.scene.remove(s.mesh); s.mesh.geometry.dispose(); this.slashes.splice(i, 1); continue; }
+      (s.mesh.material as THREE.MeshBasicMaterial).opacity = s.t * 0.8;
     }
 
     // falling trees / crumbling rocks
