@@ -27,6 +27,7 @@ interface Tracked {
   toolKind: 'axe' | 'pick' | null;
   hitT: number;            // >0 right after taking damage — flash/shake window
   lastHp: number;
+  swingHeading: number | null;   // locked facing while a swing plays
 }
 
 /** shortest-path angular damp: eases rotation instead of snapping */
@@ -320,7 +321,7 @@ export class World {
       from: new THREE.Vector3(x, 0, y), to: new THREE.Vector3(x, 0, y),
       hpBar, animT: (id % 31) * 0.21, attackT: 0, deadT: 0, recoilT: 0,
       heading: 0, targetHeading: 0, turnRate: 0, stepSign: 1,
-      toolT: 0, toolKind: null, hitT: 0, lastHp: -1,
+      toolT: 0, toolKind: null, hitT: 0, lastHp: -1, swingHeading: null,
     };
     this.tracked.set(id, t);
     return t;
@@ -401,15 +402,36 @@ export class World {
   // ---- weapon swing slash VFX ----
   private slashes: { mesh: THREE.Mesh; t: number }[] = [];
 
-  /** Player swing: lunge + a fading arc slash in the aim direction. */
+  /** Player swing: face the cursor, lunge, and sweep a fading arc slash toward it. */
   playerSwing(pos: { x: number; y: number }, dir: { x: number; y: number }): void {
-    this.lungePlayerAt(pos.x, pos.y);
+    const len = Math.hypot(dir.x, dir.y) || 1;
+    const dx = dir.x / len, dy = dir.y / len;
+    const heading = Math.atan2(dx, dy);
+
+    // turn the nearest player to face the swing and trigger the lunge
+    let best: Tracked | null = null, bd = 3.4;
+    for (const [, t] of this.tracked) {
+      if (!t.kind.startsWith('player:')) continue;
+      const d = Math.hypot(t.obj.position.x - pos.x, t.obj.position.z - pos.y);
+      if (d < bd) { bd = d; best = t; }
+    }
+    if (best) {
+      best.targetHeading = heading;
+      best.heading = heading;           // snap so the body faces the cursor instantly
+      best.obj.rotation.y = heading;
+      best.swingHeading = heading;      // hold this facing while the swing plays
+      best.attackT = 1;
+    }
+
+    // slash arc laid flat on the ground, centred in front of the player along dir
+    const cx = (best ? best.obj.position.x : pos.x) + dx * 0.9;
+    const cz = (best ? best.obj.position.z : pos.y) + dy * 0.9;
     const arc = new THREE.Mesh(
-      new THREE.RingGeometry(1.0, 1.7, 14, 1, -0.9, 1.8),
+      new THREE.RingGeometry(0.7, 1.5, 16, 1, Math.PI / 2 - 0.9, 1.8),
       new THREE.MeshBasicMaterial({ color: 0xeef2ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
     arc.rotation.x = -Math.PI / 2;
-    arc.rotation.z = -Math.atan2(dir.x, dir.y);
-    arc.position.set(pos.x, 1.0, pos.y);
+    arc.rotation.z = -heading;           // align the cone's centre with the aim heading
+    arc.position.set(cx, 1.0, cz);
     this.scene.add(arc);
     this.slashes.push({ mesh: arc, t: 1 });
   }
@@ -469,7 +491,8 @@ export class World {
         this.selfPredicted.lerp(t.to, pull);
         t.obj.position.copy(this.selfPredicted);
         if (moving) t.targetHeading = Math.atan2(this.selfDir.x, this.selfDir.y);
-        this.applyHeading(t, dt, 12);
+        if (t.swingHeading !== null) { if (t.attackT > 0) t.targetHeading = t.swingHeading; else t.swingHeading = null; }
+        this.applyHeading(t, dt, t.swingHeading !== null ? 30 : 12);
         this.applyDeckHeight(t, dt);
         this.animateCharacter(t, moving, dt);
         continue;
@@ -480,7 +503,8 @@ export class World {
         const dx = t.to.x - t.from.x, dz = t.to.z - t.from.z;
         const moving = Math.abs(dx) + Math.abs(dz) > 0.004;
         if (moving) t.targetHeading = Math.atan2(dx, dz);
-        this.applyHeading(t, dt, t.kind.startsWith('player') ? 12 : 7);
+        if (t.swingHeading !== null) { if (t.attackT > 0) t.targetHeading = t.swingHeading; else t.swingHeading = null; }
+        this.applyHeading(t, dt, t.swingHeading !== null ? 30 : (t.kind.startsWith('player') ? 12 : 7));
         if (t.kind.startsWith('proj:')) {
           t.obj.position.y = 1.1;   // projectiles fly chest-height
         } else {
