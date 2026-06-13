@@ -29,6 +29,8 @@ interface Tracked {
   lastHp: number;
   swingHeading: number | null;   // locked facing while a swing plays
   mixer: THREE.AnimationMixer | null;   // set when the model is a GLB with clips
+  actIdle: THREE.AnimationAction | null;
+  actWalk: THREE.AnimationAction | null;
 }
 
 /** shortest-path angular damp: eases rotation instead of snapping */
@@ -326,15 +328,19 @@ export class World {
       from: new THREE.Vector3(x, 0, y), to: new THREE.Vector3(x, 0, y),
       hpBar, animT: (id % 31) * 0.21, attackT: 0, deadT: 0, recoilT: 0,
       heading: 0, targetHeading: 0, turnRate: 0, stepSign: 1,
-      toolT: 0, toolKind: null, hitT: 0, lastHp: -1, swingHeading: null, mixer: null,
+      toolT: 0, toolKind: null, hitT: 0, lastHp: -1, swingHeading: null,
+      mixer: null, actIdle: null, actWalk: null,
     };
-    // GLB models carry animation clips — drive them with a mixer (walk/idle loop)
+    // GLB models carry animation clips — crossfade idle⇄walk by movement
     const clips = obj.userData.clips as THREE.AnimationClip[] | undefined;
     if (clips && clips.length) {
       const mixer = new THREE.AnimationMixer((obj.userData.assetRoot as THREE.Object3D) ?? obj);
-      const clip = clips.find(c => /walk|idle|run|move/i.test(c.name)) ?? clips[0]!;
-      mixer.clipAction(clip).play();
-      t.mixer = mixer;
+      const find = (re: RegExp) => clips.find(c => re.test(c.name));
+      const idleC = find(/idle/i) ?? clips[0]!;
+      const walkC = find(/walk|run|gallop|move/i) ?? idleC;
+      const idle = mixer.clipAction(idleC), walk = mixer.clipAction(walkC);
+      idle.play(); walk.play(); idle.setEffectiveWeight(1); walk.setEffectiveWeight(0);
+      t.mixer = mixer; t.actIdle = idle; t.actWalk = walk;
     }
     this.tracked.set(id, t);
     return t;
@@ -521,7 +527,7 @@ export class World {
         if (t.swingHeading !== null) { if (t.attackT > 0) t.targetHeading = t.swingHeading; else t.swingHeading = null; }
         this.applyHeading(t, dt, (this.aimHeading !== null || t.swingHeading !== null) ? 26 : 12);
         this.applyDeckHeight(t, dt);
-        if (t.mixer) t.mixer.update(dt); else this.animateCharacter(t, moving, dt);
+        if (t.mixer) this.tickMixer(t, moving, dt); else this.animateCharacter(t, moving, dt);
         continue;
       }
 
@@ -536,7 +542,7 @@ export class World {
           t.obj.position.y = 1.1;   // projectiles fly chest-height
         } else {
           this.applyDeckHeight(t, dt);
-          if (t.mixer) t.mixer.update(dt); else this.animateCharacter(t, moving, dt);
+          if (t.mixer) this.tickMixer(t, moving, dt); else this.animateCharacter(t, moving, dt);
         }
       } else {
         this.animateBuilding(t, dt);
@@ -603,6 +609,18 @@ export class World {
     }
   }
 
+  /** Advance a GLB creature's mixer, crossfading idle⇄walk by movement. */
+  private tickMixer(t: Tracked, moving: boolean, dt: number): void {
+    if (!t.mixer) return;
+    if (t.actWalk && t.actIdle) {
+      const cur = t.actWalk.getEffectiveWeight();
+      const w = cur + ((moving ? 1 : 0) - cur) * Math.min(1, dt * 8);
+      t.actWalk.setEffectiveWeight(w);
+      t.actIdle.setEffectiveWeight(1 - w);
+    }
+    t.mixer.update(dt);
+  }
+
   /** Eased turning + banking: characters lean into turns instead of snapping. */
   private applyHeading(t: Tracked, dt: number, lambda: number): void {
     const before = t.heading;
@@ -613,7 +631,8 @@ export class World {
     const instRate = dt > 0 ? dh / dt : 0;
     t.turnRate += (instRate - t.turnRate) * Math.min(1, dt * 10);
     t.obj.rotation.y = t.heading;
-    t.obj.rotation.z = THREE.MathUtils.clamp(-t.turnRate * 0.045, -0.16, 0.16);
+    // banking lean is for the humanoid rig; GLB quadrupeds must stay upright
+    t.obj.rotation.z = t.mixer ? 0 : THREE.MathUtils.clamp(-t.turnRate * 0.045, -0.16, 0.16);
   }
 
   /** Characters step up onto the bridge deck instead of clipping through it. */
