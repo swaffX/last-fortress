@@ -38,7 +38,10 @@ const SPAWN_MIN_DIST = 18;
 const DESPAWN_DIST = 90;
 const PROJECTILE_SPEED = { spit: 9, bolt: 16 } as const;
 const BARE_HAND_DMG = 4;
-const SWING_COOLDOWN = 12;
+const SWING_COOLDOWN = 11;
+const KNOCKBACK = 0.55;          // impulse applied to a creature on melee hit
+const HIT_STAGGER = 8;           // ticks a creature is stunned after a hit
+const SWING_HALF_DOT = 0.0;      // forward 180° sweep; aim-assist guarantees the pointed target
 
 export class Sim {
   readonly state: SimState;
@@ -474,14 +477,22 @@ export class Sim {
       if (isWeapon && def!.ranged) {
         this.spawnProjectile('bolt', p.pos, dir, dmg, true, events);
       } else {
+        // forward sweep + aim assist: always land the creature most in line with the
+        // cursor (within reach), plus any others inside the forward arc.
+        let assistId: EntityId | null = null, assistDot = -2;
+        const inReach: { id: EntityId; dot: number }[] = [];
         for (const c of this.state.creatures.values()) {
           const dx = c.pos.x - p.pos.x, dy = c.pos.y - p.pos.y;
           const d = Math.hypot(dx, dy);
-          if (d > reach + 0.6) continue;
+          const r = reach + CREATURES[c.species]!.radius;
+          if (d > r + 0.3) continue;
           const dot = (dx / (d || 1)) * dir.x + (dy / (d || 1)) * dir.y;
-          if (dot < 0.4) continue;       // outside ~120° cone
-          this.damageCreature(c.id, dmg, events);
+          if (dot > assistDot) { assistDot = dot; assistId = c.id; }
+          if (dot >= SWING_HALF_DOT) inReach.push({ id: c.id, dot });
         }
+        const hitIds = new Set(inReach.map(h => h.id));
+        if (assistId !== null && assistDot >= -0.15) hitIds.add(assistId);  // forgive a wide miss
+        for (const id of hitIds) this.hitCreature(id, dmg, dir, events);
       }
       if (isWeapon && held && held.dur !== undefined) {
         held.dur -= 1;
@@ -527,6 +538,7 @@ export class Sim {
     const c: Creature = {
       id, species, pos: { ...pos }, hp: def.hp, maxHp: def.hp,
       target: null, attackCooldown: 0, provoked: false, fleeTicks: 0,
+      staggerTicks: 0, knock: { x: 0, y: 0 },
       wanderDir: { x: this.rng.next() * 2 - 1, y: this.rng.next() * 2 - 1 }, biome,
     };
     this.state.creatures.set(id, c);
@@ -551,10 +563,22 @@ export class Sim {
       const def = CREATURES[c.species]!;
       if (c.attackCooldown > 0) c.attackCooldown--;
       if (c.fleeTicks > 0) c.fleeTicks--;
+      if (c.staggerTicks > 0) c.staggerTicks--;
 
       if (players.length && players.every(p => dist(p.pos, c.pos) > DESPAWN_DIST)) {
         this.state.creatures.delete(c.id); continue;
       }
+
+      // apply decaying knockback (slides the body, respecting walls)
+      if (Math.abs(c.knock.x) + Math.abs(c.knock.y) > 0.005) {
+        const nx = clamp(c.pos.x + c.knock.x, 0.5, MAP_SIZE - 0.5);
+        const ny = clamp(c.pos.y + c.knock.y, 0.5, MAP_SIZE - 0.5);
+        if (!this.isSolidAt({ x: nx, y: c.pos.y })) c.pos.x = nx;
+        if (!this.isSolidAt({ x: c.pos.x, y: ny })) c.pos.y = ny;
+        c.knock.x *= 0.78; c.knock.y *= 0.78;
+      }
+      // staggered creatures can't act this tick (but still slide from knockback)
+      if (c.staggerTicks > 0) continue;
 
       const speed = def.speed / TICK_RATE;
       const step = (tx: number, ty: number, s: number) => {
@@ -622,6 +646,18 @@ export class Sim {
         b.pos.x += nx * push; b.pos.y += ny * push;
       }
     }
+  }
+
+  /** Melee hit: knockback + brief stagger, then damage. */
+  private hitCreature(id: EntityId, amount: number, dir: Vec2, events: SimEvent[]): void {
+    const c = this.state.creatures.get(id);
+    if (!c) return;
+    const def = CREATURES[c.species]!;
+    const mass = def.faction === 'boss' ? 0.25 : def.radius > 0.7 ? 0.5 : 1;
+    c.knock.x += dir.x * KNOCKBACK * mass;
+    c.knock.y += dir.y * KNOCKBACK * mass;
+    c.staggerTicks = Math.max(c.staggerTicks, HIT_STAGGER);
+    this.damageCreature(id, amount, events);
   }
 
   damageCreature(id: EntityId, amount: number, events: SimEvent[]): void {

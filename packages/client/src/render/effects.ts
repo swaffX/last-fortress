@@ -104,6 +104,19 @@ export class Effects {
     this.burst(x, y, kind === 'wood' ? 0xa3845c : 0x9aa0a8, 4, 0.35, 2.2);
   }
 
+  /** Sharp impact spark at a melee/projectile hit. */
+  hitSpark(x: number, z: number): void {
+    this.flash(x, 1.0, z, 0xffffff);
+    for (let i = 0; i < 4; i++) {
+      const p = this.spawn(x, z, 0xffe2a0);
+      p.mesh.position.y = 1.0;
+      const a = Math.random() * Math.PI * 2;
+      p.vel.set(Math.cos(a) * 3, 1 + Math.random() * 2, Math.sin(a) * 3);
+      p.life = p.maxLife = 0.25;
+      p.gravity = 4;
+    }
+  }
+
   /** Soft dust puff kicked up behind a moving character (wind trail). */
   trail(x: number, z: number): void {
     const p = this.spawn(x + (Math.random() - 0.5) * 0.3, z + (Math.random() - 0.5) * 0.3, 0xcfd8cf);

@@ -258,6 +258,10 @@ export class World {
   /** Current movement input of the local player — drives client-side prediction. */
   setSelfDir(x: number, y: number): void { this.selfDir = { x, y }; }
 
+  /** While aiming (mouse held), the self player faces this heading; null = free. */
+  private aimHeading: number | null = null;
+  setAimHeading(h: number | null): void { this.aimHeading = h; }
+
   removeNode(id: EntityId): void {
     const g = this.nodes.get(id);
     if (g) { this.scene.remove(g); this.nodes.delete(id); }
@@ -491,8 +495,9 @@ export class World {
         this.selfPredicted.lerp(t.to, pull);
         t.obj.position.copy(this.selfPredicted);
         if (moving) t.targetHeading = Math.atan2(this.selfDir.x, this.selfDir.y);
+        if (this.aimHeading !== null) t.targetHeading = this.aimHeading;   // combat stance
         if (t.swingHeading !== null) { if (t.attackT > 0) t.targetHeading = t.swingHeading; else t.swingHeading = null; }
-        this.applyHeading(t, dt, t.swingHeading !== null ? 30 : 12);
+        this.applyHeading(t, dt, (this.aimHeading !== null || t.swingHeading !== null) ? 26 : 12);
         this.applyDeckHeight(t, dt);
         this.animateCharacter(t, moving, dt);
         continue;

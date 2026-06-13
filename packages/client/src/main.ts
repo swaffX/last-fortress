@@ -67,10 +67,12 @@ input.onSelectAt = cell => {
     cell.x >= bb.pos.x && cell.x < bb.pos.x + 1 && cell.y >= bb.pos.y && cell.y < bb.pos.y + 1);
   hud.selectBuilding(b ?? null);
 };
+let lastSwingSent = 0;
 input.onAttack = pt => {
   const sp = world.positionOf(selfId); if (!sp) return;
   const dir = { x: pt.x - sp.x, y: pt.y - sp.z };
   if (Math.hypot(dir.x, dir.y) < 0.01) return;
+  lastSwingSent = performance.now();
   net.send({ t: 'cmd', cmd: { kind: 'attack', dir } });
 };
 
@@ -141,6 +143,7 @@ net.on((msg: ServerMsg) => {
         if (e.kind === 'craft') hud.notify(`Crafted ${e.item.replace(/_/g, ' ')}`);
         if (e.kind === 'tool_broke' && e.playerId === selfId) hud.notify(`💥 ${e.item.replace(/_/g, ' ')} broke!`);
         if (e.kind === 'swing') world.playerSwing(e.pos, e.dir);
+        if (e.kind === 'damage') effects.hitSpark(e.pos.x, e.pos.y);
         if (e.kind === 'creature_death') effects.nodeBreak(e.pos.x, e.pos.y, 'rock');
         if (e.kind === 'projectile') effects.tracer(e.from.x, e.from.y, e.to.x, e.to.y, e.kind2 === 'bolt' ? 0xb060ff : 0x8fdc4a);
         if (e.kind === 'region_enter' && e.id === selfId) hud.regionToast(e.region);
@@ -283,6 +286,19 @@ function loop(now: number): void {
   if (inGame) {
     const d = input.dir;
     world.setSelfDir(d.x, d.y);
+    // combat: while the button is held, face the cursor and swing on cooldown
+    const sp0 = world.positionOf(selfId);
+    if (input.attacking && sp0) {
+      const aim = input.aimWorld();
+      const ax = aim.x - sp0.x, ay = aim.y - sp0.z;
+      world.setAimHeading(Math.atan2(ax, ay));
+      if (now - lastSwingSent > 160 && Math.hypot(ax, ay) > 0.01) {
+        lastSwingSent = now;
+        net.send({ t: 'cmd', cmd: { kind: 'attack', dir: { x: ax, y: ay } } });
+      }
+    } else {
+      world.setAimHeading(null);
+    }
   }
   world.render(dt);
   const selfPos = world.positionOf(selfId);

@@ -73,7 +73,8 @@ export class Input {
       const hit = this.buildingAt(cell);
       if (hit) { this.onSelectAt(cell); return; }
       this.onSelectAt({ x: -1, y: -1 });  // deselect any open panel
-      this.onAttack({ x: w.x, y: w.y });
+      this.combatDown = true;
+      this.onAttack({ x: w.x, y: w.y });   // immediate first swing
     });
     addEventListener('pointerup', e => {
       if (this.rectAnchor && this.buildType) {
@@ -86,9 +87,17 @@ export class Input {
       this.rectAnchor = null;
       this.hideRectLine();
       this.mouse.down = false;
+      this.combatDown = false;
       this.lastPlacedCell = null;
     });
+    addEventListener('blur', () => { this.combatDown = false; });
   }
+
+  private combatDown = false;
+  /** true while the left button is held over open ground (continuous swinging) */
+  get attacking(): boolean { return this.combatDown && !this.buildType; }
+  /** current cursor position projected onto the ground plane */
+  aimWorld(): { x: number; y: number } { return this.stage.screenToWorld(this.mouse.x, this.mouse.y); }
 
   private rectPerimeter(a: { x: number; y: number }, b: { x: number; y: number }): { x: number; y: number }[] {
     const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);

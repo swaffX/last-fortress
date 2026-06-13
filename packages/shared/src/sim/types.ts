@@ -51,6 +51,8 @@ export interface Creature {
   attackCooldown: number;
   provoked: boolean;               // neutral creatures engage once hit
   fleeTicks: number;               // herbivore panic timer
+  staggerTicks: number;            // brief stun after taking a hit
+  knock: Vec2;                     // decaying knockback velocity
   wanderDir: Vec2;
   biome: string;
 }
