@@ -34,7 +34,13 @@ async function main() {
       if (!filePath.startsWith(normalize(CLIENT_DIST))) { res.writeHead(403).end(); return; }
       try { await stat(filePath); } catch { filePath = join(CLIENT_DIST, 'index.html'); }
       const body = await readFile(filePath);
-      res.writeHead(200, { 'content-type': MIME[extname(filePath)] ?? 'application/octet-stream' });
+      const ext = extname(filePath);
+      // hashed assets are immutable & cacheable; HTML must never be stale (it points at the
+      // current hashed bundle) — otherwise a rebuild leaves browsers on an old bundle.
+      const cache = ext === '.html'
+        ? 'no-store'
+        : /\/assets\//.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache';
+      res.writeHead(200, { 'content-type': MIME[ext] ?? 'application/octet-stream', 'cache-control': cache });
       res.end(body);
     } catch {
       res.writeHead(404).end('not found');
