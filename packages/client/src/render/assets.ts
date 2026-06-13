@@ -79,5 +79,6 @@ export function assetInstance(name: string): THREE.Group | null {
   g.add(inner);
   g.userData.clips = a.clips;
   g.userData.assetRoot = inner;
+  g.userData.baseY = a.yOffset;
   return g;
 }

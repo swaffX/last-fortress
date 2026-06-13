@@ -31,6 +31,7 @@ interface Tracked {
   mixer: THREE.AnimationMixer | null;   // set when the model is a GLB with clips
   actIdle: THREE.AnimationAction | null;
   actWalk: THREE.AnimationAction | null;
+  bobWalk: boolean;   // GLB lacks a walk clip → procedural waddle while moving
 }
 
 /** shortest-path angular damp: eases rotation instead of snapping */
@@ -329,7 +330,7 @@ export class World {
       hpBar, animT: (id % 31) * 0.21, attackT: 0, deadT: 0, recoilT: 0,
       heading: 0, targetHeading: 0, turnRate: 0, stepSign: 1,
       toolT: 0, toolKind: null, hitT: 0, lastHp: -1, swingHeading: null,
-      mixer: null, actIdle: null, actWalk: null,
+      mixer: null, actIdle: null, actWalk: null, bobWalk: false,
     };
     // GLB models carry animation clips — crossfade idle⇄walk by movement
     const clips = obj.userData.clips as THREE.AnimationClip[] | undefined;
@@ -337,10 +338,17 @@ export class World {
       const mixer = new THREE.AnimationMixer((obj.userData.assetRoot as THREE.Object3D) ?? obj);
       const find = (re: RegExp) => clips.find(c => re.test(c.name));
       const idleC = find(/idle/i) ?? clips[0]!;
-      const walkC = find(/walk|run|gallop|move/i) ?? idleC;
-      const idle = mixer.clipAction(idleC), walk = mixer.clipAction(walkC);
-      idle.play(); walk.play(); idle.setEffectiveWeight(1); walk.setEffectiveWeight(0);
-      t.mixer = mixer; t.actIdle = idle; t.actWalk = walk;
+      const walkC = find(/walk|run|gallop|trot|move/i);
+      const idle = mixer.clipAction(idleC);
+      idle.play(); idle.setEffectiveWeight(1);
+      t.mixer = mixer; t.actIdle = idle;
+      if (walkC && walkC !== idleC) {
+        const walk = mixer.clipAction(walkC);
+        walk.play(); walk.setEffectiveWeight(0);
+        t.actWalk = walk;
+      } else {
+        t.bobWalk = true;   // no distinct walk clip → procedural waddle
+      }
     }
     this.tracked.set(id, t);
     return t;
@@ -609,7 +617,7 @@ export class World {
     }
   }
 
-  /** Advance a GLB creature's mixer, crossfading idle⇄walk by movement. */
+  /** Advance a GLB creature's mixer, crossfading idle⇄walk (or a procedural waddle). */
   private tickMixer(t: Tracked, moving: boolean, dt: number): void {
     if (!t.mixer) return;
     if (t.actWalk && t.actIdle) {
@@ -619,6 +627,20 @@ export class World {
       t.actIdle.setEffectiveWeight(1 - w);
     }
     t.mixer.update(dt);
+    if (t.bobWalk) {
+      const inner = t.obj.userData.assetRoot as THREE.Object3D | undefined;
+      if (inner) {
+        const baseY = (t.obj.userData.baseY as number) ?? 0;
+        if (moving) {
+          const ph = this.time * 11 + t.animT * 10;
+          inner.position.y = baseY + Math.abs(Math.sin(ph)) * 0.12;   // bounce
+          inner.rotation.z = Math.sin(ph) * 0.08;                     // waddle
+        } else {
+          inner.position.y += (baseY - inner.position.y) * Math.min(1, dt * 8);
+          inner.rotation.z += (0 - inner.rotation.z) * Math.min(1, dt * 8);
+        }
+      }
+    }
   }
 
   /** Eased turning + banking: characters lean into turns instead of snapping. */
