@@ -275,6 +275,8 @@ button { font-family: inherit; cursor: pointer; }
 .char-modal {
   position: relative; width: min(920px, 95vw); height: min(580px, 90vh);
   display: grid; grid-template-columns: 0.95fr 1.2fr 0.95fr; gap: 1px;
+}
+.char-modal.wide { width: min(1020px, 96vw); height: min(620px, 92vh); grid-template-columns: 0.85fr 1.45fr 0.8fr;
   background: #2a3548; border: 1px solid #34425a;
   box-shadow: 0 30px 80px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.04);
   clip-path: polygon(0 16px, 16px 0, calc(100% - 16px) 0, 100% 16px,
@@ -372,6 +374,25 @@ button { font-family: inherit; cursor: pointer; }
 .ch-hint { margin-top: auto; font-size: 11.5px; line-height: 1.55; color: #7d8ea4;
   border-top: 1px solid #232f42; padding-top: 12px; }
 .ch-hint b { color: var(--gold); }
+
+/* TAB inventory grid + craft chips */
+.ch-invgrid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin-bottom: 4px; }
+.ch-slot { position: relative; aspect-ratio: 1; background: rgba(7,11,18,0.55); border: 1px solid #283549;
+  border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; }
+.ch-slot.hot { border-color: #3a4a64; box-shadow: inset 0 0 0 1px rgba(217,169,63,0.12); }
+.ch-slot.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+.ch-slot .key { position: absolute; top: 1px; left: 3px; font-size: 8px; color: #5d6f86; }
+.ch-slot .it-ico { font-size: 19px; }
+.ch-slot .it-n { position: absolute; bottom: 1px; right: 3px; font-size: 10px; font-weight: 700; color: #f0e6d2; text-shadow: 0 1px 2px #000; }
+.ch-slot .dur { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 3px; background: rgba(0,0,0,0.6); border-radius: 2px; overflow: hidden; }
+.ch-slot .dur-fill { display: block; height: 100%; background: linear-gradient(90deg,#c43a31,#6fbf63); }
+.ch-cats { display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap; }
+.ch-chip { font-size: 11px; padding: 4px 10px; border-radius: 20px; cursor: pointer;
+  background: rgba(7,11,18,0.6); border: 1px solid #2a3548; color: #9fb0c4; }
+.ch-chip:hover { border-color: #46597a; color: #d8e2ee; }
+.ch-chip.on { background: linear-gradient(180deg, #d9a93f, #b9842a); border-color: #d9a93f; color: #1a1206; font-weight: 700; }
+.ch-card small { font-size: 9px; color: #7d8ea4; letter-spacing: 0.04em; text-transform: uppercase; }
+.ch-empty { color: #5d6f86; text-align: center; padding: 20px 0; font-size: 12px; }
 
 /* ---- survival HUD ---- */
 .vitals {

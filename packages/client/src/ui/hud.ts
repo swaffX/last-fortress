@@ -51,13 +51,12 @@ export class Hud {
       <div class="party-panel" id="party-panel"></div>
       <div id="hotbar-slot"></div>
       <div id="backpack-slot"></div>
-      <div id="craft-slot"></div>
       <div id="character-slot"></div>
       <div class="build-menu hidden" id="build-menu">
         <div class="bm-title">Construction</div>
         <div class="bm-grid" id="bm-grid"></div>
       </div>
-      <div class="hud-hint">WASD move · [E] gather/eat · 1–9 hotbar · Tab/B character · I bag · C workbench · Enter chat</div>
+      <div class="hud-hint">WASD move · L-click attack · [E] gather/eat · 1–9 hotbar · Tab character & craft · Enter chat</div>
       <div class="minimap"><canvas id="minimap" width="164" height="164"></canvas></div>
       <div class="sel-panel hidden" id="sel-panel"></div>
       <div class="interact-prompt hidden" id="interact-prompt"></div>
