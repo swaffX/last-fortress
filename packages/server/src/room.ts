@@ -258,6 +258,8 @@ function validCommand(cmd: Command): boolean {
     case 'select_hand': return Number.isInteger(cmd.slot);
     case 'move_item': return Number.isInteger(cmd.from) && Number.isInteger(cmd.to);
     case 'drop_item': return Number.isInteger(cmd.slot) && Number.isInteger(cmd.count) && cmd.count > 0;
+    case 'craft': return typeof cmd.recipeId === 'string';
+    case 'repair_hand': return true;
     case 'build': return typeof cmd.type === 'string' && cmd.type in BUILDINGS && isFiniteVec(cmd.pos);
     case 'demolish': return Number.isInteger(cmd.buildingId);
     default: return false;
