@@ -421,6 +421,15 @@ button { font-family: inherit; cursor: pointer; }
 .backpack .bp-grid { display: grid; grid-template-columns: repeat(9, 48px); gap: 5px; }
 
 .region-name { color: var(--gold); font-weight: 700; letter-spacing: 0.04em; }
+.threat { font-size: 12px; font-weight: 700; color: #e8b64c; letter-spacing: 0.04em; }
+.threat.danger { color: #e0473c; animation: threat-pulse 1s ease-in-out infinite; }
+@keyframes threat-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+.boss-bar { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); width: min(440px, 70vw);
+  background: rgba(13,20,32,0.85); border: 1px solid #5a2a2a; clip-path: var(--chamfer); padding: 7px 14px; }
+.boss-name { color: #e8584a; font-family: var(--display, serif); font-size: 1.05rem; letter-spacing: 0.1em;
+  text-align: center; text-transform: uppercase; margin-bottom: 5px; text-shadow: 0 0 12px rgba(196,58,49,0.5); }
+.boss-track { height: 12px; background: rgba(7,11,18,0.85); border-radius: 6px; overflow: hidden; border: 1px solid #3a1f1f; }
+.boss-fill { height: 100%; background: linear-gradient(90deg, #7a1f1a, #e0473c); transition: width 0.2s ease; }
 .region-toast {
   position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
   font-family: var(--display, serif); font-size: 2rem; color: var(--parchment);

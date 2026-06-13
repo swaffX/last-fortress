@@ -38,6 +38,11 @@ export class Hud {
         <span class="phase-pill day" id="phase-pill">Day</span>
         <span id="phase-timer" style="font-variant-numeric:tabular-nums;color:var(--steel)"></span>
         <span class="region-name" id="region-name"></span>
+        <span class="threat hidden" id="threat"></span>
+      </div>
+      <div class="boss-bar hidden" id="boss-bar">
+        <div class="boss-name" id="boss-name"></div>
+        <div class="boss-track"><div class="boss-fill" id="boss-fill"></div></div>
       </div>
       <div class="vitals" id="vitals">
         <div class="vital hp"><span class="ico">❤</span><div class="track"><div class="fill" id="hp-fill"></div></div><span class="v" id="hp-v"></span></div>
@@ -251,6 +256,22 @@ export class Hud {
     if (layer.childElementCount > 80) {
       while (layer.childElementCount > 60) layer.firstElementChild!.remove();
     }
+  }
+
+  updateThreat(count: number, danger: boolean): void {
+    const el = this.q('#threat');
+    if (count <= 0 && !danger) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    el.classList.toggle('danger', danger);
+    el.textContent = danger ? `⚠ DANGER · ⚔ ${count}` : `⚔ ${count} nearby`;
+  }
+
+  setBoss(name: string | null, hpRatio: number): void {
+    const bar = this.q('#boss-bar');
+    if (!name) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+    this.q('#boss-name').textContent = name;
+    (this.q('#boss-fill')).style.width = `${Math.max(0, hpRatio * 100)}%`;
   }
 
   setPerf(fps: number, ping: number | null): void {

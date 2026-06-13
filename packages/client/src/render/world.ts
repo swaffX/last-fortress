@@ -3,9 +3,10 @@ import {
   BUILDINGS, MAP_SIZE, riverParams, inRiver, inRiverBand, onBridge, crossesBridgeRail,
   decorBlocks, type EntityId, type RiverParams, type Decor,
 } from '@lf/shared';
-import type { BuildingView, PlayerView, NodeView, GroundItemView } from '../net';
+import type { BuildingView, PlayerView, NodeView, GroundItemView, CreatureView, ProjectileView } from '../net';
 import {
   buildingModel, playerModel, treeModel, rockModel, bushModel, itemModel, toolModel,
+  creatureModel, projectileModel,
 } from './models';
 
 interface Tracked {
@@ -209,7 +210,8 @@ export class World {
 
   /** Called once per server frame (20 Hz). render() interpolates between frames. */
   applyFrame(players: PlayerView[], buildings: BuildingView[],
-             groundItems: GroundItemView[]): void {
+             groundItems: GroundItemView[], creatures: CreatureView[] = [],
+             projectiles: ProjectileView[] = []): void {
     const seen = new Set<EntityId>();
 
     for (const p of players) {
@@ -218,6 +220,16 @@ export class World {
         () => playerModel(), 1);   // hp shown on the nameplate, not the bar
       this.updateNameplate(t, p.id === this.selfId ? 'You' : p.name, p.hp / p.maxHp,
         p.id === this.selfId);
+    }
+    for (const c of creatures) {
+      seen.add(c.id);
+      this.upsert(c.id, `creature:${c.species}`, c.pos.x, c.pos.y,
+        () => creatureModel(c.species), c.hp / c.maxHp);
+    }
+    for (const pr of projectiles) {
+      seen.add(pr.id);
+      this.upsert(pr.id, `proj:${pr.kind}`, pr.pos.x, pr.pos.y,
+        () => projectileModel(pr.kind), 1);
     }
     for (const b of buildings) {
       seen.add(b.id);
@@ -386,6 +398,22 @@ export class World {
     if (best && best.attackT <= 0) best.attackT = 1;
   }
 
+  // ---- weapon swing slash VFX ----
+  private slashes: { mesh: THREE.Mesh; t: number }[] = [];
+
+  /** Player swing: lunge + a fading arc slash in the aim direction. */
+  playerSwing(pos: { x: number; y: number }, dir: { x: number; y: number }): void {
+    this.lungePlayerAt(pos.x, pos.y);
+    const arc = new THREE.Mesh(
+      new THREE.RingGeometry(1.0, 1.7, 14, 1, -0.9, 1.8),
+      new THREE.MeshBasicMaterial({ color: 0xeef2ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
+    arc.rotation.x = -Math.PI / 2;
+    arc.rotation.z = -Math.atan2(dir.x, dir.y);
+    arc.position.set(pos.x, 1.0, pos.y);
+    this.scene.add(arc);
+    this.slashes.push({ mesh: arc, t: 1 });
+  }
+
   /**
    * Gathering swing: the nearest player faces the node, the weapon is
    * swapped for an axe/pickaxe in the right hand, and an overhead chop plays.
@@ -462,6 +490,15 @@ export class World {
       } else {
         this.animateBuilding(t, dt);
       }
+    }
+
+    // weapon slash arcs fade + expand
+    for (let i = this.slashes.length - 1; i >= 0; i--) {
+      const s = this.slashes[i]!;
+      s.t -= dt * 4;
+      if (s.t <= 0) { this.scene.remove(s.mesh); this.slashes.splice(i, 1); continue; }
+      s.mesh.scale.setScalar(1 + (1 - s.t) * 0.4);
+      (s.mesh.material as THREE.MeshBasicMaterial).opacity = s.t * 0.85;
     }
 
     // falling trees / crumbling rocks

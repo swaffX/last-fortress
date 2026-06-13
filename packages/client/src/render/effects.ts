@@ -152,7 +152,7 @@ export class Effects {
     this.flashes.push({ mesh, life: 0.09 });
   }
 
-  private tracer(x1: number, z1: number, x2: number, z2: number, color: number): void {
+  tracer(x1: number, z1: number, x2: number, z2: number, color: number): void {
     const geo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(x1, 1.6, z1), new THREE.Vector3(x2, 0.8, z2),
     ]);

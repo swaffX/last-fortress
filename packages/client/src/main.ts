@@ -1,6 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
-import { riverParams, generateDecor } from '@lf/shared';
+import { riverParams, generateDecor, CREATURES } from '@lf/shared';
 import { Net, type ServerMsg, type ProfileView, type BuildingView, type NodeView, type PlayerView } from './net';
 import { Stage } from './render/scene';
 import { World } from './render/world';
@@ -67,6 +67,12 @@ input.onSelectAt = cell => {
     cell.x >= bb.pos.x && cell.x < bb.pos.x + 1 && cell.y >= bb.pos.y && cell.y < bb.pos.y + 1);
   hud.selectBuilding(b ?? null);
 };
+input.onAttack = pt => {
+  const sp = world.positionOf(selfId); if (!sp) return;
+  const dir = { x: pt.x - sp.x, y: pt.y - sp.z };
+  if (Math.hypot(dir.x, dir.y) < 0.01) return;
+  net.send({ t: 'cmd', cmd: { kind: 'attack', dir } });
+};
 
 // ---- net → everything ----
 net.on((msg: ServerMsg) => {
@@ -112,7 +118,7 @@ net.on((msg: ServerMsg) => {
       lastFrameBuildings = msg.buildings;
       input.buildings = msg.buildings;
       world.colliders = { buildings: msg.buildings, nodes: lastNodes };
-      world.applyFrame(msg.players, msg.buildings, msg.groundItems);
+      world.applyFrame(msg.players, msg.buildings, msg.groundItems, msg.creatures, msg.projectiles);
       selfView = msg.players.find(p => p.id === selfId);
       for (const e of msg.events) {
         if (e.kind === 'melee') world.lungePlayerAt(e.pos.x, e.pos.y);
@@ -134,6 +140,9 @@ net.on((msg: ServerMsg) => {
         }
         if (e.kind === 'craft') hud.notify(`Crafted ${e.item.replace(/_/g, ' ')}`);
         if (e.kind === 'tool_broke' && e.playerId === selfId) hud.notify(`💥 ${e.item.replace(/_/g, ' ')} broke!`);
+        if (e.kind === 'swing') world.playerSwing(e.pos, e.dir);
+        if (e.kind === 'creature_death') effects.nodeBreak(e.pos.x, e.pos.y, 'rock');
+        if (e.kind === 'projectile') effects.tracer(e.from.x, e.from.y, e.to.x, e.to.y, e.kind2 === 'bolt' ? 0xb060ff : 0x8fdc4a);
         if (e.kind === 'region_enter' && e.id === selfId) hud.regionToast(e.region);
         if (e.kind === 'player_respawn' && e.id === selfId) hud.banner('You respawn at camp');
         if (e.kind === 'phase_change') {
@@ -148,6 +157,22 @@ net.on((msg: ServerMsg) => {
       stage.setGameTick(msg.tick);
       hud.updateFrame(selfView, msg.players, msg.buildings, msg.phase, msg.phaseTicks, selfId);
       hud.handleEvents(msg.events, project);
+      // threat + boss readout from nearby creatures
+      if (selfView) {
+        let hostiles = 0, boss: { name: string; ratio: number } | null = null;
+        for (const c of msg.creatures) {
+          const def = CREATURES[c.species];
+          if (!def) continue;
+          const hostile = def.faction === 'bandit' || def.faction === 'zombie' || def.faction === 'boss'
+            || def.behavior === 'aggressive' || def.behavior === 'pack';
+          if (!hostile) continue;
+          const d = Math.hypot(c.pos.x - selfView.pos.x, c.pos.y - selfView.pos.y);
+          if (d < 18) hostiles++;
+          if (def.faction === 'boss') boss = { name: def.id.replace(/_/g, ' '), ratio: c.hp / c.maxHp };
+        }
+        hud.updateThreat(hostiles, msg.phase === 'night' && hostiles > 2);
+        hud.setBoss(boss ? boss.name.toUpperCase() : null, boss?.ratio ?? 0);
+      }
       if (selfView) {
         inventory.setData(selfView.inventory, selfView.equipment, selfView.hand);
         const nearTable = msg.buildings.some(b => b.type === 'crafting_table'

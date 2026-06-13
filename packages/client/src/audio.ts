@@ -28,6 +28,9 @@ export class Audio {
     for (const e of events) {
       switch (e.kind) {
         case 'melee': this.sfx('swing', () => this.swing()); break;
+        case 'swing': this.sfx('swing', () => this.swing()); break;
+        case 'creature_death': this.sfx('growl', () => this.growl()); break;
+        case 'projectile': this.sfx(e.kind2, () => e.kind2 === 'bolt' ? this.ice() : this.spit()); break;
         case 'gather':
           if (e.resource === 'wood') this.sfx('chop', () => this.chop());
           else if (e.resource === 'stone') this.sfx('mine', () => this.mine());

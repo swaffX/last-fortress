@@ -34,6 +34,7 @@ export class Input {
   get cursor(): { x: number; y: number } { return { x: this.mouse.x, y: this.mouse.y }; }
   private lastPlacedCell: string | null = null;
   onSelectAt: (cell: { x: number; y: number }) => void = () => {};
+  onAttack: (worldPt: { x: number; y: number }) => void = () => {};
   buildings: BuildingView[] = [];
   nodes: NodeView[] = [];
   riverP: RiverParams | null = null;
@@ -67,12 +68,12 @@ export class Input {
         }
         return;
       }
-      // building under cursor → select; empty ground → just deselect.
-      // Combat is fully automatic — bare clicks trigger nothing.
+      // building under cursor → select; open ground → swing the held weapon.
       const cell = { x: Math.floor(w.x), y: Math.floor(w.y) };
       const hit = this.buildingAt(cell);
       if (hit) { this.onSelectAt(cell); return; }
-      this.onSelectAt({ x: -1, y: -1 });  // deselect
+      this.onSelectAt({ x: -1, y: -1 });  // deselect any open panel
+      this.onAttack({ x: w.x, y: w.y });
     });
     addEventListener('pointerup', e => {
       if (this.rectAnchor && this.buildType) {
