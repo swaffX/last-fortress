@@ -5,6 +5,10 @@ export {
 export { Rng } from './sim/rng';
 export { Grid } from './sim/grid';
 export { generateMap, type MapData } from './sim/mapgen';
+export { ITEMS, type ItemId, type ItemDef, type ItemCategory, type ItemStack, type Slot } from './sim/data/items';
+export {
+  addItem, removeItem, countItem, firstEmpty, moveSlot, emptyInventory,
+} from './sim/inventory';
 export * from './sim/types';
 export * from './sim/constants';
 export { BUILDINGS, type BuildingDef, type TierStats } from './sim/data/buildings';
