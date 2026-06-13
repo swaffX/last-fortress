@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { decode, encode } from './protocol';
 import { issueToken, verifyToken } from './auth';
-import { createStore, tryUnlockSkill, type Profile } from './db';
+import { createPool, createStore, tryUnlockSkill, type Profile } from './db';
+import { createWorldStore } from './world-store';
 import { LobbyManager } from './lobby';
 import type { Room } from './room';
 
@@ -20,8 +21,10 @@ const MIME: Record<string, string> = {
 };
 
 async function main() {
-  const store = await createStore();
-  const lobbies = new LobbyManager(store);
+  const pool = createPool();
+  const store = await createStore(pool);
+  const worlds = await createWorldStore(pool);
+  const lobbies = new LobbyManager(store, worlds);
 
   const http = createServer(async (req, res) => {
     // static client serving with SPA fallback
@@ -65,8 +68,8 @@ async function main() {
           if (conn.room && !conn.room.hasWs(ws)) conn.room = null;   // lobby dissolved earlier
           if (!conn.profile || conn.room) return;
           conn.room = lobbies.createRoom(msg.solo);
-          conn.room.addPlayer(ws, conn.profile, msg.klass);
-          if (msg.solo) conn.room.handleStart(ws);
+          conn.room.addPlayer(ws, conn.profile);
+          if (msg.solo) void conn.room.handleStart(ws);
           break;
         }
         case 'join_lobby': {
@@ -75,14 +78,12 @@ async function main() {
           const room = lobbies.findJoinable(msg.code, conn.profile.deviceId);
           if (!room) { ws.send(encode({ t: 'error', message: 'Lobby not found or full' })); return; }
           conn.room = room;
-          room.addPlayer(ws, conn.profile, msg.klass);
+          room.addPlayer(ws, conn.profile);
           break;
         }
-        case 'start_game': conn.room?.handleStart(ws); break;
+        case 'start_game': void conn.room?.handleStart(ws); break;
         case 'cmd': conn.room?.handleCommand(ws, msg.cmd); break;
         case 'ping': conn.room?.handlePing(ws, msg.pos); break;
-        case 'vote': conn.room?.handleVote(ws, msg.option); break;
-        case 'restart_vote': conn.room?.handleRestartVote(ws); break;
         case 'chat': conn.room?.handleChat(ws, msg.text); break;
         case 'latency': ws.send(encode({ t: 'latency', n: msg.n })); break;
         case 'ghost': conn.room?.handleGhost(ws, msg.type, msg.pos, msg.ok); break;

@@ -1,12 +1,13 @@
 import { Room } from './room';
 import type { ProfileStore } from './db';
+import type { WorldStore } from './world-store';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 
 export class LobbyManager {
   private rooms = new Map<string, Room>();
 
-  constructor(private store: ProfileStore) {}
+  constructor(private store: ProfileStore, private worlds: WorldStore) {}
 
   createRoom(solo: boolean): Room {
     let code: string;
@@ -14,7 +15,8 @@ export class LobbyManager {
       code = Array.from({ length: 5 }, () =>
         CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
     } while (this.rooms.has(code));
-    const room = new Room(code, solo, this.store, c => this.rooms.delete(c));
+    // party id == lobby code (stable per lobby) — world persistence key
+    const room = new Room(code, solo, this.store, this.worlds, code, c => this.rooms.delete(c));
     this.rooms.set(code, room);
     return room;
   }
@@ -24,7 +26,7 @@ export class LobbyManager {
     const room = this.rooms.get(code.toUpperCase());
     if (!room) return null;
     if (room.isJoinable) return room;
-    if (room.hasDevice(deviceId)) return room;   // reconnect into running game
+    if (room.hasDevice(deviceId)) return room;
     return null;
   }
 

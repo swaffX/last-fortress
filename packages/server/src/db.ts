@@ -21,10 +21,15 @@ function freshProfile(deviceId: string): Profile {
   };
 }
 
+/** Create the shared pg pool once, or null when DATABASE_URL is unset. */
+export function createPool(): pg.Pool | null {
+  const url = process.env.DATABASE_URL;
+  return url ? new pg.Pool({ connectionString: url }) : null;
+}
+
 /** Postgres-backed store. Used when DATABASE_URL is set (production). */
 class PgStore implements ProfileStore {
-  private pool: pg.Pool;
-  constructor(url: string) { this.pool = new pg.Pool({ connectionString: url }); }
+  constructor(private pool: pg.Pool) {}
 
   async init(): Promise<void> {
     await this.pool.query(`
@@ -56,10 +61,9 @@ class MemoryStore implements ProfileStore {
   async save(p: Profile): Promise<void> { this.map.set(p.deviceId, p); }
 }
 
-export async function createStore(): Promise<ProfileStore> {
-  const url = process.env.DATABASE_URL;
-  if (url) {
-    const store = new PgStore(url);
+export async function createStore(pool: pg.Pool | null): Promise<ProfileStore> {
+  if (pool) {
+    const store = new PgStore(pool);
     await store.init();
     console.log('[db] using postgres');
     return store;
