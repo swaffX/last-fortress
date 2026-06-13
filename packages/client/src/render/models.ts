@@ -468,9 +468,14 @@ function spiderModel(col: number): THREE.Group {
   const legs: THREE.Mesh[] = [];
   for (let i = 0; i < 8; i++) {
     const side = i < 4 ? -1 : 1;
-    const leg = box(0.05, 0.05, 0.6, col, 0.4);
-    leg.position.set(side * 0.35, 0.4, (i % 4 - 1.5) * 0.18);
-    leg.rotation.z = side * 0.6;
+    const k = i % 4;
+    const len = 0.5;
+    const geo = new THREE.BoxGeometry(len, 0.06, 0.06);
+    geo.translate(side * len / 2, 0, 0);            // extend outward (±X) from the hip
+    const leg = new THREE.Mesh(geo, mat(col));
+    leg.position.set(side * 0.16, 0.4, (k - 1.5) * 0.18);   // hip at body side, spread front/back
+    leg.rotation.z = side * -0.4;                   // outer end dips toward the ground
+    leg.userData.baseRz = side * -0.4;
     legs.push(leg);
   }
   for (const ex of [-0.08, 0.08]) head.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 3), mat(0xff3322, 0xff3322)), ex, 0.05, 0.18));

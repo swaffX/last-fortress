@@ -731,7 +731,10 @@ export class World {
       return;
     }
     if (gait === 'skitter') {
-      for (let i = 0; i < legs.length; i++) legs[i]!.rotation.x = Math.sin(t.animT + i * 0.8) * 0.25 * (active ? 1 : 0.25);
+      for (let i = 0; i < legs.length; i++) {
+        const base = (legs[i]!.userData.baseRz as number) ?? 0;
+        legs[i]!.rotation.z = base + Math.sin(t.animT + i * 0.8) * 0.16 * (active ? 1 : 0.3);
+      }
       body.position.y = bodyY + Math.abs(Math.sin(t.animT)) * anim.bob * (active ? 1 : 0);
       return;
     }
