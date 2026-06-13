@@ -25,13 +25,13 @@ const MANIFEST: Record<string, { url: string; scale?: number; yaw?: number }> = 
   tree: { url: '/models/tree.glb', scale: 1 },
   rock: { url: '/models/rock.glb', scale: 1 },
   bush: { url: '/models/bush.glb', scale: 1 },
-  // animals (Quaternius Animated Animal Pack names → rename files to these)
-  creature_cow: { url: '/models/cow.glb', scale: 1 },
-  creature_sheep: { url: '/models/sheep.glb', scale: 1 },
-  creature_pig: { url: '/models/pig.glb', scale: 1 },
-  creature_chicken: { url: '/models/chicken.glb', scale: 1 },
-  creature_wolf: { url: '/models/wolf.glb', scale: 1 },
-  creature_bear: { url: '/models/bear.glb', scale: 1 },
+  // animals (Quaternius CC0 packs; scale measured from each GLB's world bbox)
+  creature_cow: { url: '/models/cow.glb', scale: 0.29 },     // ~1.5u tall
+  creature_sheep: { url: '/models/sheep.glb', scale: 0.25 }, // ~1.1u
+  creature_pig: { url: '/models/pig.glb', scale: 0.20 },     // ~0.9u
+  creature_chicken: { url: '/models/chicken.glb', scale: 0.25 },
+  creature_wolf: { url: '/models/wolf.glb', scale: 0.28 },
+  creature_bear: { url: '/models/bear.glb', scale: 0.4 },
   // props
   campfire: { url: '/models/campfire.glb', scale: 1 },
 };
