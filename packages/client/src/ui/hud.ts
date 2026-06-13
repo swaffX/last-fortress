@@ -142,11 +142,11 @@ export class Hud {
     setTimeout(() => el.remove(), 1600);
   }
 
-  setCombat(level: number, gold: number, cost: number): void {
+  setCombat(level: number, coins: number, cost: number): void {
     this.q('#strike-lv').textContent = String(level);
     const milestone = (level + 1) % 5 === 0 ? ' ★' : '';
-    this.q('#strike-cost').textContent = `▲ ${cost}G${milestone}`;
-    this.q('#inv-strike').classList.toggle('poor', gold < cost);
+    this.q('#strike-cost').textContent = `▲ ${cost}💰${milestone}`;
+    this.q('#inv-strike').classList.toggle('poor', coins < cost);
   }
 
   toggleBuildMenu(open?: boolean): void {
@@ -262,7 +262,7 @@ export class Hud {
         !cost || res.wood < cost.w || res.stone < cost.s);
     }
     const self = players.find(p => p.id === selfId);
-    if (self) this.setCombat(self.combatLevel, res.gold, combatUpgradeCost(self.combatLevel));
+    if (self) this.setCombat(self.combatLevel, res.coins, combatUpgradeCost(self.combatLevel));
 
     // party panel
     const panel = this.q('#party-panel');

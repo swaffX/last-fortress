@@ -139,9 +139,10 @@ export class Sim {
         break;
       }
       case 'upgrade_combat': {
+        // paid in coins — the kill currency naturally funds combat growth
         const cost = combatUpgradeCost(p.combatLevel);
-        if (this.state.resources.gold >= cost) {
-          this.state.resources.gold -= cost;
+        if (this.state.resources.coins >= cost) {
+          this.state.resources.coins -= cost;
           p.combatLevel++;
         }
         break;
