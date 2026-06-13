@@ -50,7 +50,7 @@ hud.onDemolish = id => {
 input.send = cmd => net.send({ t: 'cmd', cmd });
 input.ping = pos => net.send({ t: 'ping', pos });
 input.onBuildCancel = () => hud.clearBuild();
-hud.onToolUpgrade = tool => net.send({ t: 'upgrade_tool', tool });
+hud.onToolUpgrade = tool => net.send({ t: 'cmd', cmd: { kind: 'upgrade_tool', tool } });
 hud.onCombatUpgrade = () => net.send({ t: 'cmd', cmd: { kind: 'upgrade_combat' } });
 world.onBuildingHit = (x, z) => effects.gatherHit(x, z, 'stone');   // dust puff on struck walls
 let prevCombatLevel = 0;
@@ -71,30 +71,19 @@ net.on((msg: ServerMsg) => {
   switch (msg.t) {
     case 'welcome':
       profile = msg.profile;
-      hud.setTools(profile.tools);
       if (!inGame) screens.menu(profile);
       break;
-    case 'profile': {
-      const newProfile = msg.profile;
-      if (inGame) {
-        if (newProfile.tools.axe > prevTools.axe) {
-          hud.slotPopup('inv-axe', `🪓 Axe Tier ${['', 'I', 'II', 'III'][newProfile.tools.axe]}!`);
-        }
-        if (newProfile.tools.pick > prevTools.pick) {
-          hud.slotPopup('inv-pick', `⛏ Pick Tier ${['', 'I', 'II', 'III'][newProfile.tools.pick]}!`);
-        }
-      }
-      prevTools = { ...newProfile.tools };
-      profile = newProfile;
-      hud.setTools(profile.tools);
+    case 'profile':
+      profile = msg.profile;
       if (!inGame) screens.menu(profile);
       break;
-    }
     case 'lobby':
       screens.lobby(msg.code, msg.players, msg.host);
       break;
     case 'game_start':
       inGame = true;
+      prevCombatLevel = 0;
+      prevTools = { axe: 1, pick: 1 };
       selfId = msg.selfId;
       world.reset();
       world.selfId = msg.selfId;
@@ -159,11 +148,17 @@ net.on((msg: ServerMsg) => {
       hud.handleEvents(msg.events, project);
       {
         const self = msg.players.find(p => p.id === selfId);
-        if (self && self.combatLevel > prevCombatLevel) {
-          const milestone = self.combatLevel % 5 === 0;
-          hud.slotPopup('inv-strike',
-            milestone ? `⚔️ Lv ${self.combatLevel} — DMG + SPEED!` : `⚔️ Strike Lv ${self.combatLevel}!`);
+        if (self) {
+          const roman = ['', 'I', 'II', 'III'];
+          if (self.combatLevel > prevCombatLevel) {
+            const milestone = self.combatLevel % 5 === 0;
+            hud.slotPopup('inv-strike',
+              milestone ? `⚔️ Lv ${self.combatLevel} — DMG + SPEED!` : `⚔️ Strike Lv ${self.combatLevel}!`);
+          }
+          if (self.axeTier > prevTools.axe) hud.slotPopup('inv-axe', `🪓 Axe Tier ${roman[self.axeTier]}!`);
+          if (self.pickTier > prevTools.pick) hud.slotPopup('inv-pick', `⛏ Pick Tier ${roman[self.pickTier]}!`);
           prevCombatLevel = self.combatLevel;
+          prevTools = { axe: self.axeTier, pick: self.pickTier };
         }
       }
       break;

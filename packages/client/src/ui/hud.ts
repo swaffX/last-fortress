@@ -1,6 +1,6 @@
 import {
   BUILDINGS, MAP_SIZE, riverParams, riverYAt, RIVER_WIDTH, BRIDGE_XS, CASTLE_POS,
-  combatUpgradeCost,
+  combatUpgradeCost, TOOL_UPGRADE_COSTS,
   type BuildingType, type Resources, type Phase, type SimEvent,
 } from '@lf/shared';
 import type { UpgradeDef } from '@lf/shared';
@@ -32,15 +32,10 @@ function costStr(type: BuildingType): string {
   return parts.join(' ');
 }
 
-/** crafting costs + labels per current tier (mirrors the server table) */
-const TOOL_COSTS: Record<'axe' | 'pick', Record<number, { w: number; s: number } | null>> = {
-  axe: { 1: { w: 60, s: 20 }, 2: { w: 150, s: 80 }, 3: null },
-  pick: { 1: { w: 40, s: 30 }, 2: { w: 100, s: 90 }, 3: null },
-};
-const TOOL_COST_LABEL: Record<'axe' | 'pick', Record<number, string>> = {
-  axe: { 1: '▲ 60W 20S', 2: '▲ 150W 80S', 3: 'MAX' },
-  pick: { 1: '▲ 40W 30S', 2: '▲ 100W 90S', 3: 'MAX' },
-};
+function toolCostLabel(tool: 'axe' | 'pick', tier: number): string {
+  const c = TOOL_UPGRADE_COSTS[tool][tier + 1];
+  return c ? `▲ ${c.wood}W ${c.stone}S` : 'MAX';
+}
 
 export class Hud {
   private root: HTMLElement;
@@ -156,16 +151,13 @@ export class Hud {
   }
   get buildMenuOpen(): boolean { return !this.q('#build-menu').classList.contains('hidden'); }
 
-  private lastTools = { axe: 1, pick: 1 };
-
-  /** Refresh tool tiers + crafting costs on the inventory bar. */
+  /** Refresh tool tiers + crafting costs on the inventory bar (per-match). */
   setTools(tools: { axe: number; pick: number }): void {
-    this.lastTools = { ...tools };
     const roman = ['', 'I', 'II', 'III'];
     this.q('#axe-tier').textContent = roman[tools.axe] ?? 'III';
     this.q('#pick-tier').textContent = roman[tools.pick] ?? 'III';
-    this.q('#axe-cost').textContent = TOOL_COST_LABEL.axe[Math.min(3, tools.axe)]!;
-    this.q('#pick-cost').textContent = TOOL_COST_LABEL.pick[Math.min(3, tools.pick)]!;
+    this.q('#axe-cost').textContent = toolCostLabel('axe', tools.axe);
+    this.q('#pick-cost').textContent = toolCostLabel('pick', tools.pick);
   }
 
   private q(sel: string): HTMLElement { return this.root.querySelector(sel)!; }
@@ -255,14 +247,18 @@ export class Hud {
       el.classList.toggle('poor', !afford);
     }
 
-    // inventory affordability: tools (wood/stone) and strike (gold)
-    for (const tool of ['axe', 'pick'] as const) {
-      const cost = TOOL_COSTS[tool][Math.min(3, this.lastTools[tool])];
-      this.q(`#inv-${tool}`).classList.toggle('poor',
-        !cost || res.wood < cost.w || res.stone < cost.s);
-    }
+    // inventory: tiers/costs from the live match state, dim when unaffordable
     const self = players.find(p => p.id === selfId);
-    if (self) this.setCombat(self.combatLevel, res.coins, combatUpgradeCost(self.combatLevel));
+    if (self) {
+      this.setTools({ axe: self.axeTier, pick: self.pickTier });
+      for (const tool of ['axe', 'pick'] as const) {
+        const tier = tool === 'axe' ? self.axeTier : self.pickTier;
+        const cost = TOOL_UPGRADE_COSTS[tool][tier + 1];
+        this.q(`#inv-${tool}`).classList.toggle('poor',
+          !cost || res.wood < cost.wood || res.stone < cost.stone);
+      }
+      this.setCombat(self.combatLevel, res.coins, combatUpgradeCost(self.combatLevel));
+    }
 
     // party panel
     const panel = this.q('#party-panel');

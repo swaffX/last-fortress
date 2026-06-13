@@ -15,7 +15,6 @@ export type ClientMsg =
   | { t: 'vote'; option: number }                                // wave-upgrade vote (0..2)
   | { t: 'restart_vote' }                                        // game-over: try again
   | { t: 'chat'; text: string }
-  | { t: 'upgrade_tool'; tool: 'axe' | 'pick' }                  // costs team coins
   | { t: 'latency'; n: number }                                  // echoed back for RTT
   | { t: 'ghost'; type: BuildingType | null; pos: Vec2; ok: boolean }  // build cursor shared with team
   | { t: 'leave' };
@@ -29,6 +28,7 @@ export interface EnemyView {
 export interface PlayerView {
   id: EntityId; klass: ClassType; pos: Vec2; hp: number; maxHp: number;
   alive: boolean; name: string; combatLevel: number;
+  axeTier: number; pickTier: number;
 }
 export interface NodeView {
   id: EntityId; kind: 'tree' | 'rock'; pos: Vec2; amount: number;
@@ -65,7 +65,6 @@ export interface ProfileView {
   bestWave: number;
   totalKills: number;
   gamesPlayed: number;
-  tools: { axe: number; pick: number };
 }
 
 export function encode(msg: ServerMsg): string { return JSON.stringify(msg); }

@@ -11,13 +11,7 @@ import type { Profile, ProfileStore } from './db';
 
 const MAX_PLAYERS = 2;
 const RECONNECT_MS = 60_000;
-const MAX_CMDS_PER_TICK = 24;   // hold-to-gather sends every input tick
-
-/** crafting costs per target tier */
-const TOOL_COSTS: Record<'axe' | 'pick', Record<number, { wood: number; stone: number } | undefined>> = {
-  axe: { 2: { wood: 60, stone: 20 }, 3: { wood: 150, stone: 80 } },
-  pick: { 2: { wood: 40, stone: 30 }, 3: { wood: 100, stone: 90 } },
-};
+const MAX_CMDS_PER_TICK = 24;
 
 interface Seat {
   deviceId: string;
@@ -107,7 +101,7 @@ export class Room {
     this.state = 'playing';
     this.sim = new Sim(this.seed);
     for (const seat of this.seats) {
-      const p = this.sim.addPlayer(seat.klass, seat.profile.unlockedSkills, seat.profile.tools);
+      const p = this.sim.addPlayer(seat.klass, seat.profile.unlockedSkills);
       seat.playerId = p.id;
     }
     for (const seat of this.seats) this.sendGameStart(seat);
@@ -127,23 +121,6 @@ export class Room {
     const seat = this.seats.find(s => s.ws === ws);
     if (!seat) return;
     this.broadcast({ t: 'ping', pos, from: seat.profile.name });
-  }
-
-  /** Tool upgrades cost raw materials (crafting), persist on the profile. */
-  handleToolUpgrade(ws: WebSocket, tool: 'axe' | 'pick'): { profile: Profile } | null {
-    const seat = this.seats.find(s => s.ws === ws);
-    if (!seat || !this.sim || this.state !== 'playing') return null;
-    const tier = seat.profile.tools[tool];
-    const cost = TOOL_COSTS[tool][tier + 1];
-    if (!cost) return null;
-    const res = this.sim.state.resources;
-    if (res.wood < cost.wood || res.stone < cost.stone) return null;
-    res.wood -= cost.wood;
-    res.stone -= cost.stone;
-    seat.profile.tools[tool] = tier + 1;
-    if (seat.playerId !== null) this.sim.setPlayerTool(seat.playerId, tool, tier + 1);
-    void this.store.save(seat.profile);
-    return { profile: seat.profile };
   }
 
   handleChat(ws: WebSocket, text: string): void {
@@ -240,7 +217,7 @@ export class Room {
     this.sim = new Sim(this.seed);
     for (const seat of this.seats) {
       seat.kills = 0;
-      const p = this.sim.addPlayer(seat.klass, seat.profile.unlockedSkills, seat.profile.tools);
+      const p = this.sim.addPlayer(seat.klass, seat.profile.unlockedSkills);
       seat.playerId = p.id;
     }
     this.state = 'playing';
@@ -318,7 +295,8 @@ export class Room {
       const p = this.sim!.state.players.get(seat.playerId);
       if (!p) continue;
       out.push({ id: p.id, klass: p.klass, pos: p.pos, hp: p.hp, maxHp: p.maxHp,
-                 alive: p.alive, name: seat.profile.name, combatLevel: p.combatLevel });
+                 alive: p.alive, name: seat.profile.name, combatLevel: p.combatLevel,
+                 axeTier: p.axeTier, pickTier: p.pickTier });
     }
     return out;
   }
@@ -373,6 +351,8 @@ function validCommand(cmd: Command): boolean {
       return isFiniteVec(cmd.dir);
     case 'gather': case 'upgrade_combat':
       return true;
+    case 'upgrade_tool':
+      return cmd.tool === 'axe' || cmd.tool === 'pick';
     case 'build':
       return typeof cmd.type === 'string' && cmd.type in BUILDINGS && isFiniteVec(cmd.pos);
     case 'upgrade': case 'demolish':

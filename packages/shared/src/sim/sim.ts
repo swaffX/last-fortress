@@ -36,6 +36,13 @@ const GATHER_RANGE = 2.8;
 /** tool tier → resources per swing */
 const TOOL_YIELD = [0, 4, 7, 11];
 
+/** crafting costs per target tier — tools are match progression, not persistent */
+export const TOOL_UPGRADE_COSTS: Record<'axe' | 'pick',
+  Record<number, { wood: number; stone: number } | undefined>> = {
+  axe: { 2: { wood: 60, stone: 20 }, 3: { wood: 150, stone: 80 } },
+  pick: { 2: { wood: 40, stone: 30 }, 3: { wood: 100, stone: 90 } },
+};
+
 /**
  * Strike upgrades: each level +8% damage; every 5th level additionally
  * +6% attack speed — steady growth with milestone spikes.
@@ -136,6 +143,17 @@ export class Sim {
           if (d <= bd) { bd = d; best = n; }
         }
         if (best) p.gatherTarget = best.id;
+        break;
+      }
+      case 'upgrade_tool': {
+        const tier = cmd.tool === 'axe' ? p.axeTier : p.pickTier;
+        const cost = TOOL_UPGRADE_COSTS[cmd.tool][tier + 1];
+        if (cost && this.state.resources.wood >= cost.wood &&
+            this.state.resources.stone >= cost.stone) {
+          this.state.resources.wood -= cost.wood;
+          this.state.resources.stone -= cost.stone;
+          if (cmd.tool === 'axe') p.axeTier++; else p.pickTier++;
+        }
         break;
       }
       case 'upgrade_combat': {

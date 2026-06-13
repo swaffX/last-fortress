@@ -118,7 +118,8 @@ export type Command =
   | { kind: 'move'; dir: Vec2 }                                  // dir normalized client-side; re-normalized in sim
   | { kind: 'attack'; dir: Vec2 }                                // legacy no-op (combat is automatic)
   | { kind: 'gather' }                                           // E key: harvest nearest node in reach
-  | { kind: 'upgrade_combat' }                                   // strike upgrade, costs team gold
+  | { kind: 'upgrade_combat' }                                   // strike upgrade, costs team coins
+  | { kind: 'upgrade_tool'; tool: 'axe' | 'pick' }               // crafted from team wood/stone
   | { kind: 'build'; type: BuildingType; pos: Vec2 }
   | { kind: 'upgrade'; buildingId: EntityId }
   | { kind: 'demolish'; buildingId: EntityId };

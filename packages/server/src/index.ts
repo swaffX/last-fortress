@@ -84,14 +84,6 @@ async function main() {
         case 'vote': conn.room?.handleVote(ws, msg.option); break;
         case 'restart_vote': conn.room?.handleRestartVote(ws); break;
         case 'chat': conn.room?.handleChat(ws, msg.text); break;
-        case 'upgrade_tool': {
-          const result = conn.room?.handleToolUpgrade(ws, msg.tool);
-          if (result) {
-            conn.profile = result.profile;
-            ws.send(encode({ t: 'profile', profile: result.profile }));
-          }
-          break;
-        }
         case 'latency': ws.send(encode({ t: 'latency', n: msg.n })); break;
         case 'ghost': conn.room?.handleGhost(ws, msg.type, msg.pos, msg.ok); break;
         case 'unlock_skill': {

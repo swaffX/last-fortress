@@ -18,7 +18,6 @@ function freshProfile(deviceId: string): Profile {
     bestWave: 0,
     totalKills: 0,
     gamesPlayed: 0,
-    tools: { axe: 1, pick: 1 },
   };
 }
 
@@ -38,10 +37,7 @@ class PgStore implements ProfileStore {
   async get(deviceId: string): Promise<Profile> {
     const r = await this.pool.query('SELECT data FROM profiles WHERE device_id = $1', [deviceId]);
     if (r.rows.length === 0) return freshProfile(deviceId);
-    const fresh = freshProfile(deviceId);
-    const merged = { ...fresh, ...r.rows[0].data, deviceId };
-    merged.tools = { ...fresh.tools, ...(r.rows[0].data.tools ?? {}) };   // older rows lack tools
-    return merged;
+    return { ...freshProfile(deviceId), ...r.rows[0].data, deviceId };
   }
   async save(p: Profile): Promise<void> {
     await this.pool.query(
