@@ -1,17 +1,19 @@
+import * as THREE from 'three';
 import { RECIPES, ITEMS, BUILDINGS, countItem, type Recipe, type ItemId, type BuildingType } from '@lf/shared';
 import type { PlayerView } from '../net';
+import { playerModel } from '../render/models';
 
 const ICON: Record<string, string> = {
   wood: '🪵', stone: '🧱', berry: '🫐', stick: '🪵', crafting_table: '🛠',
   wood_axe: '🪓', stone_axe: '🪓', wood_pick: '⛏', stone_pick: '⛏',
   wood_sword: '🗡', stone_sword: '⚔️', wood_spear: '🔱',
 };
-const BUILD: { type: BuildingType; name: string }[] = [
-  { type: 'wood_wall', name: 'Wood Wall' },
-  { type: 'stone_wall', name: 'Stone Wall' },
-  { type: 'gate', name: 'Gate' },
-  { type: 'spike', name: 'Spikes' },
-  { type: 'crafting_table', name: 'Workbench' },
+const BUILD: { type: BuildingType; name: string; ico: string }[] = [
+  { type: 'wood_wall', name: 'Wood Wall', ico: '🪵' },
+  { type: 'stone_wall', name: 'Stone Wall', ico: '🧱' },
+  { type: 'gate', name: 'Gate', ico: '🚪' },
+  { type: 'spike', name: 'Spikes', ico: '🗡' },
+  { type: 'crafting_table', name: 'Workbench', ico: '🛠' },
 ];
 
 export interface CharacterUI {
@@ -23,8 +25,89 @@ export interface CharacterUI {
   onRepair: () => void;
 }
 
-/** Always-available basics: hand-craftable recipes (no workbench needed). */
 const BASICS: Recipe[] = RECIPES.filter(r => !r.requiresTable);
+
+/** Self-contained spinning 3D portrait of the survivor model. */
+class Portrait {
+  private renderer: THREE.WebGLRenderer | null = null;
+  private scene = new THREE.Scene();
+  private camera = new THREE.PerspectiveCamera(34, 0.8, 0.1, 100);
+  private model: THREE.Group | null = null;
+  private raf = 0;
+  private last = 0;
+  private spin = 0;
+
+  constructor(private host: HTMLElement) {}
+
+  private init(): void {
+    if (this.renderer) return;
+    this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    this.renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.host.appendChild(this.renderer.domElement);
+    this.renderer.domElement.style.width = '100%';
+    this.renderer.domElement.style.height = '100%';
+    this.renderer.domElement.style.display = 'block';
+
+    this.scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x20160c, 0.9));
+    const key = new THREE.DirectionalLight(0xfff0d8, 1.5);
+    key.position.set(2.5, 4, 3);
+    this.scene.add(key);
+    const rim = new THREE.PointLight(0xd9a93f, 14, 12);
+    rim.position.set(-2, 2.2, -1.5);
+    this.scene.add(rim);
+    const fill = new THREE.PointLight(0x6db8d8, 6, 10);
+    fill.position.set(2, 1, -2);
+    this.scene.add(fill);
+
+    this.model = playerModel();
+    this.scene.add(this.model);
+    // soft contact shadow disc under the feet
+    const disc = new THREE.Mesh(
+      new THREE.CircleGeometry(0.6, 24),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 }));
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.y = 0.01;
+    this.scene.add(disc);
+
+    this.camera.position.set(0, 1.25, 4.0);
+    this.camera.lookAt(0, 1.0, 0);
+  }
+
+  private resize(): void {
+    if (!this.renderer) return;
+    const w = Math.max(120, this.host.clientWidth);
+    const h = Math.max(150, this.host.clientHeight);
+    this.renderer.setSize(w, h, false);
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+  }
+
+  start(): void {
+    this.init();
+    this.resize();
+    this.last = performance.now();
+    const loop = (now: number) => {
+      const dt = Math.min(0.05, (now - this.last) / 1000);
+      this.last = now;
+      this.spin += dt * 0.55;
+      if (this.model) {
+        this.model.rotation.y = Math.sin(this.spin) * 0.6;      // sway turn, not full spin
+        const body = this.model.userData.body as THREE.Mesh | undefined;
+        if (body) body.position.y = 0.75 + Math.sin(now * 0.0022) * 0.02;   // idle breath
+        const arms = this.model.userData.arms as THREE.Mesh[] | undefined;
+        if (arms) { arms[0]!.rotation.x = Math.sin(now * 0.0018) * 0.05; arms[1]!.rotation.x = -Math.sin(now * 0.0018) * 0.05; }
+        const flags = this.model.userData.flags as THREE.Mesh[] | undefined;
+        if (flags) for (const f of flags) f.rotation.x = 0.15 + Math.sin(now * 0.003) * 0.08;
+      }
+      this.renderer!.render(this.scene, this.camera);
+      this.raf = requestAnimationFrame(loop);
+    };
+    cancelAnimationFrame(this.raf);
+    this.raf = requestAnimationFrame(loop);
+  }
+  stop(): void { cancelAnimationFrame(this.raf); this.raf = 0; }
+}
 
 export function createCharacterUI(root: HTMLElement): CharacterUI {
   let self: PlayerView | undefined;
@@ -38,34 +121,36 @@ export function createCharacterUI(root: HTMLElement): CharacterUI {
       <button class="cf-close" id="ch-close">✕</button>
       <div class="ch-col ch-left">
         <div class="ch-coltitle">Survivor</div>
-        <div class="ch-avatar" id="ch-avatar"><div class="ch-figure">🧍</div></div>
+        <div class="ch-portrait" id="ch-portrait"><div class="ch-pglow"></div></div>
         <div class="ch-name" id="ch-name">—</div>
+        <div class="ch-namesub" id="ch-namesub"></div>
         <div class="ch-equip">
-          <div class="ch-eq" data-s="head"><span>⛑</span><b>Head</b><i id="eq-head">—</i></div>
-          <div class="ch-eq" data-s="body"><span>🥋</span><b>Body</b><i id="eq-body">—</i></div>
-          <div class="ch-eq" data-s="legs"><span>👖</span><b>Legs</b><i id="eq-legs">—</i></div>
-          <div class="ch-eq hand" data-s="hand"><span>✋</span><b>In Hand</b><i id="eq-hand">—</i></div>
+          <div class="ch-eq" data-s="head"><span class="ch-eqi">⛑</span><b>Head</b><i id="eq-head">empty</i></div>
+          <div class="ch-eq" data-s="body"><span class="ch-eqi">🥋</span><b>Body</b><i id="eq-body">empty</i></div>
+          <div class="ch-eq" data-s="legs"><span class="ch-eqi">👖</span><b>Legs</b><i id="eq-legs">empty</i></div>
+          <div class="ch-eq hand" data-s="hand"><span class="ch-eqi">✋</span><b>In Hand</b><i id="eq-hand">empty</i></div>
         </div>
         <button class="ch-repair hidden" id="ch-repair"></button>
       </div>
       <div class="ch-col ch-mid">
-        <div class="ch-coltitle">Make</div>
-        <div class="ch-sub">Craft by hand — anywhere</div>
+        <div class="ch-secthead"><span class="ch-coltitle">Make</span><span class="ch-secthint">hand · anywhere</span></div>
         <div class="ch-list" id="ch-craft"></div>
-        <div class="ch-coltitle" style="margin-top:6px">Build</div>
-        <div class="ch-sub">Select, then place in the world</div>
+        <div class="ch-secthead"><span class="ch-coltitle">Build</span><span class="ch-secthint">select · then place</span></div>
         <div class="ch-list ch-build" id="ch-build"></div>
       </div>
       <div class="ch-col ch-right">
         <div class="ch-coltitle">Status</div>
         <div class="ch-vitals" id="ch-vitals"></div>
-        <div class="ch-hint">More gear needs a Workbench — craft one, place it, press <b>C</b> beside it.</div>
+        <div class="ch-info" id="ch-info"></div>
+        <div class="ch-hint">More gear needs a Workbench — craft one, place it, then press <b>C</b> beside it.</div>
       </div>
     </div>`;
 
+  const portrait = new Portrait(root.querySelector('#ch-portrait') as HTMLElement);
   const craftEl = root.querySelector('#ch-craft') as HTMLElement;
   const buildEl = root.querySelector('#ch-build') as HTMLElement;
   const vitalsEl = root.querySelector('#ch-vitals') as HTMLElement;
+  const infoEl = root.querySelector('#ch-info') as HTMLElement;
   const repairBtn = root.querySelector('#ch-repair') as HTMLButtonElement;
 
   (root.querySelector('#ch-close') as HTMLElement).onclick = () => api.toggle(false);
@@ -77,40 +162,43 @@ export function createCharacterUI(root: HTMLElement): CharacterUI {
   function canBuild(type: BuildingType): boolean {
     return (Object.entries(BUILDINGS[type].cost) as [ItemId, number][]).every(([k, v]) => have(k) >= v);
   }
-  const costStr = (entries: { item: ItemId; count: number }[]) =>
-    entries.map(i => `${i.count}${ICON[i.item] ?? '▪'}`).join(' ');
+  const pills = (entries: { item: ItemId; count: number }[]) =>
+    entries.map(i => {
+      const enough = have(i.item) >= i.count;
+      return `<span class="ch-pill ${enough ? '' : 'short'}">${ICON[i.item] ?? '▪'} ${i.count}</span>`;
+    }).join('');
 
   function render(): void {
     craftEl.innerHTML = BASICS.map(r => {
       const ok = canCraft(r);
-      return `<button class="ch-row${ok ? '' : ' poor'}" data-craft="${r.id}">
-        <span class="ch-ric">${ICON[r.output.item] ?? '▪'}</span>
-        <span class="ch-rnm">${ITEMS[r.output.item].name}${r.output.count > 1 ? ` ×${r.output.count}` : ''}</span>
-        <span class="ch-rcost">${costStr(r.inputs)}</span></button>`;
+      return `<button class="ch-card${ok ? '' : ' locked'}" data-craft="${r.id}">
+        <span class="ch-tile">${ICON[r.output.item] ?? '▪'}</span>
+        <span class="ch-cnm">${ITEMS[r.output.item].name}${r.output.count > 1 ? `<em> ×${r.output.count}</em>` : ''}</span>
+        <span class="ch-pills">${pills(r.inputs)}</span></button>`;
     }).join('');
     buildEl.innerHTML = BUILD.map(b => {
-      const cost = (Object.entries(BUILDINGS[b.type].cost) as [ItemId, number][])
-        .map(([k, v]) => ({ item: k, count: v }));
+      const cost = (Object.entries(BUILDINGS[b.type].cost) as [ItemId, number][]).map(([k, v]) => ({ item: k, count: v }));
       const ok = canBuild(b.type);
-      return `<button class="ch-row${ok ? '' : ' poor'}" data-build="${b.type}">
-        <span class="ch-ric">${ICON[b.type === 'crafting_table' ? 'crafting_table' : (b.type.startsWith('stone') ? 'stone' : 'wood')] ?? '▪'}</span>
-        <span class="ch-rnm">${b.name}</span>
-        <span class="ch-rcost">${costStr(cost)}</span></button>`;
+      return `<button class="ch-card build${ok ? '' : ' locked'}" data-build="${b.type}">
+        <span class="ch-tile">${b.ico}</span>
+        <span class="ch-cnm">${b.name}</span>
+        <span class="ch-pills">${pills(cost)}</span></button>`;
     }).join('');
     for (const el of craftEl.querySelectorAll<HTMLElement>('[data-craft]'))
       el.onclick = () => api.onCraft(el.dataset.craft!);
     for (const el of buildEl.querySelectorAll<HTMLElement>('[data-build]'))
       el.onclick = () => { api.onPlace(el.dataset.build as BuildingType); api.toggle(false); };
 
-    // equipment / hand
     const held = self?.inventory[self.hand];
-    (root.querySelector('#eq-hand') as HTMLElement).textContent = held ? ITEMS[held.item].name : '—';
-    (root.querySelector('#ch-name') as HTMLElement).textContent = self?.name ?? '—';
+    setEq('hand', held ? ITEMS[held.item].name : null);
     for (const s of ['head', 'body', 'legs'] as const) {
       const eq = self?.equipment[s];
-      (root.querySelector(`#eq-${s}`) as HTMLElement).textContent = eq ? ITEMS[eq.item].name : '—';
+      setEq(s, eq ? ITEMS[eq.item].name : null);
     }
-    // repair
+    (root.querySelector('#ch-name') as HTMLElement).textContent = self?.name ?? '—';
+    (root.querySelector('#ch-namesub') as HTMLElement).textContent =
+      self ? `${phase === 'day' ? 'Day' : 'Night'} · ${self.region}` : '';
+
     const max = held ? ITEMS[held.item].durabilityMax : undefined;
     const repairable = !!held && max !== undefined && held.dur !== undefined && held.dur < max;
     repairBtn.classList.toggle('hidden', !repairable);
@@ -124,25 +212,40 @@ export function createCharacterUI(root: HTMLElement): CharacterUI {
     renderVitals();
   }
 
-  function bar(label: string, ico: string, val: number, max: number, color: string): string {
+  function setEq(slot: string, name: string | null): void {
+    const el = root.querySelector(`#eq-${slot}`) as HTMLElement;
+    el.textContent = name ?? 'empty';
+    el.classList.toggle('empty', !name);
+  }
+
+  function bar(label: string, ico: string, val: number, max: number, cls: string): string {
     const pct = Math.max(0, Math.min(100, (val / max) * 100));
-    return `<div class="ch-vit"><div class="ch-vlbl"><span>${ico}</span>${label}<b>${Math.round(val)}</b></div>
-      <div class="ch-vtrack"><div class="ch-vfill" style="width:${pct}%;background:${color}"></div></div></div>`;
+    return `<div class="ch-vit">
+      <div class="ch-vlbl"><span>${ico}</span>${label}<b>${Math.round(val)}</b></div>
+      <div class="ch-vtrack ${cls}"><div class="ch-vfill" style="width:${pct}%"></div></div></div>`;
   }
   function renderVitals(): void {
-    if (!self) { vitalsEl.innerHTML = ''; return; }
-    const time = phase === 'day' ? `Day · ${Math.ceil(phaseTicks / 20)}s` : 'Night';
+    if (!self) { vitalsEl.innerHTML = ''; infoEl.innerHTML = ''; return; }
     vitalsEl.innerHTML =
-      bar('Health', '❤', self.hp, self.maxHp, 'linear-gradient(90deg,#c43a31,#e05b4a)') +
-      bar('Hunger', '🍖', self.hunger, 100, 'linear-gradient(90deg,#c08a3a,#e8b64c)') +
-      bar('Warmth', '🌡', self.temperature, 100, 'linear-gradient(90deg,#5aa0c8,#8fd0e8)') +
-      `<div class="ch-stat"><span>🧭</span>Region<b>${self.region}</b></div>` +
-      `<div class="ch-stat"><span>🕗</span>Time<b>${time}</b></div>`;
+      bar('Health', '❤', self.hp, self.maxHp, 'v-hp') +
+      bar('Hunger', '🍖', self.hunger, 100, 'v-hunger') +
+      bar('Warmth', '🌡', self.temperature, 100, 'v-warm');
+    const time = phase === 'day' ? `Day · ${Math.ceil(phaseTicks / 20)}s` : 'Night';
+    infoEl.innerHTML =
+      `<div class="ch-irow"><span>🧭</span>Region<b>${self.region}</b></div>` +
+      `<div class="ch-irow"><span>🕗</span>Time<b>${time}</b></div>`;
   }
 
   const api: CharacterUI = {
     setContext(s, ph, pt, _nt) { self = s; phase = ph; phaseTicks = pt; if (open) render(); },
-    toggle(o?: boolean) { open = o ?? !open; root.classList.toggle('hidden', !open); if (open) render(); },
+    toggle(o?: boolean) {
+      const next = o ?? !open;
+      if (next === open) return;
+      open = next;
+      root.classList.toggle('hidden', !open);
+      if (open) { render(); requestAnimationFrame(() => portrait.start()); }
+      else portrait.stop();
+    },
     isOpen() { return open; },
     onCraft: () => {},
     onPlace: () => {},
