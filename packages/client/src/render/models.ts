@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { BuildingType } from '@lf/shared';
+import { assetInstance } from './assets';
 
 /**
  * Procedural low-poly models — no external assets.
@@ -354,6 +355,8 @@ export function toolModel(kind: 'axe' | 'pick'): THREE.Group {
  * variant: 0 = pine, 1 = oak (blobby crown), 2 = tall fir.
  */
 export function treeModel(variant = 0, jitter = 0): THREE.Group {
+  const asset = assetInstance('tree');
+  if (asset) { asset.rotation.y = jitter * 6.28; return asset; }
   const leafColor = new THREE.Color(LEAF).offsetHSL(jitter * 0.06 - 0.03, jitter * 0.15 - 0.05, jitter * 0.1 - 0.05).getHex();
   const leafColor2 = new THREE.Color(0x4a8a3d).offsetHSL(jitter * 0.05 - 0.025, 0, jitter * 0.08 - 0.04).getHex();
   let sway: THREE.Object3D[];
@@ -540,6 +543,8 @@ function zombieModel(col: number, scale: number): THREE.Group {
 }
 
 export function creatureModel(species: string): THREE.Group {
+  const asset = assetInstance(`creature_${species}`);
+  if (asset) return asset;
   let g: THREE.Group;
   switch (species) {
     case 'cow': g = quadruped(0x6b5640, 0xe8e2d4, { big: true, tail: true }); break;

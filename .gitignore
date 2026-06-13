@@ -12,3 +12,6 @@ dist/
 
 # obsidian app workspace state (keep the notes, drop the workspace cache)
 Obsidian-LastFortress/.obsidian/
+
+# drop-in 3D assets (licensed separately, added locally / at deploy)
+packages/client/public/models/*.glb

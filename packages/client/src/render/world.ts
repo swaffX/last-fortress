@@ -28,6 +28,7 @@ interface Tracked {
   hitT: number;            // >0 right after taking damage — flash/shake window
   lastHp: number;
   swingHeading: number | null;   // locked facing while a swing plays
+  mixer: THREE.AnimationMixer | null;   // set when the model is a GLB with clips
 }
 
 /** shortest-path angular damp: eases rotation instead of snapping */
@@ -325,8 +326,16 @@ export class World {
       from: new THREE.Vector3(x, 0, y), to: new THREE.Vector3(x, 0, y),
       hpBar, animT: (id % 31) * 0.21, attackT: 0, deadT: 0, recoilT: 0,
       heading: 0, targetHeading: 0, turnRate: 0, stepSign: 1,
-      toolT: 0, toolKind: null, hitT: 0, lastHp: -1, swingHeading: null,
+      toolT: 0, toolKind: null, hitT: 0, lastHp: -1, swingHeading: null, mixer: null,
     };
+    // GLB models carry animation clips — drive them with a mixer (walk/idle loop)
+    const clips = obj.userData.clips as THREE.AnimationClip[] | undefined;
+    if (clips && clips.length) {
+      const mixer = new THREE.AnimationMixer((obj.userData.assetRoot as THREE.Object3D) ?? obj);
+      const clip = clips.find(c => /walk|idle|run|move/i.test(c.name)) ?? clips[0]!;
+      mixer.clipAction(clip).play();
+      t.mixer = mixer;
+    }
     this.tracked.set(id, t);
     return t;
   }
@@ -512,7 +521,7 @@ export class World {
         if (t.swingHeading !== null) { if (t.attackT > 0) t.targetHeading = t.swingHeading; else t.swingHeading = null; }
         this.applyHeading(t, dt, (this.aimHeading !== null || t.swingHeading !== null) ? 26 : 12);
         this.applyDeckHeight(t, dt);
-        this.animateCharacter(t, moving, dt);
+        if (t.mixer) t.mixer.update(dt); else this.animateCharacter(t, moving, dt);
         continue;
       }
 
@@ -527,7 +536,7 @@ export class World {
           t.obj.position.y = 1.1;   // projectiles fly chest-height
         } else {
           this.applyDeckHeight(t, dt);
-          this.animateCharacter(t, moving, dt);
+          if (t.mixer) t.mixer.update(dt); else this.animateCharacter(t, moving, dt);
         }
       } else {
         this.animateBuilding(t, dt);

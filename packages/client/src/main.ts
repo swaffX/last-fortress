@@ -12,6 +12,7 @@ import { Screens } from './ui/screens';
 import { createInventoryUI } from './ui/inventory';
 import { createCharacterUI } from './ui/character';
 import { Input } from './input';
+import { preloadAssets } from './render/assets';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const stage = new Stage(canvas);
@@ -348,3 +349,5 @@ function loop(now: number): void {
 requestAnimationFrame(loop);
 
 net.connect();
+// optional GLB assets — used automatically if present, procedural fallback otherwise
+void preloadAssets();
