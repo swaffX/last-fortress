@@ -559,10 +559,17 @@ function buildCreature(spec: CreatureBlueprint): THREE.Group {
   const body = box(b.w, b.h, b.d, b.col, bodyY);
   if (b.round) body.scale.set(1.0, 0.92, 1.05);
 
-  // head at the front (+z); birds carry it higher on an upright neck
-  const headY = spec.gait === 'bird' ? bodyY + b.h * 0.75 : bodyY + b.h * 0.15;
+  // head reaches forward (+z); birds carry it higher on an upright neck
+  const headY = spec.gait === 'bird' ? bodyY + b.h * 0.75 : bodyY + b.h * 0.2;
   const head = box(h.size, h.size, h.size, h.col, headY);
-  head.position.z = b.d / 2 + h.size * 0.25;
+  head.position.z = b.d / 2 + h.size * 0.4;
+  if (spec.gait !== 'bird') head.rotation.x = 0.12;   // reach down toward the ground
+  // short neck bridges body → head so it doesn't read as a cube stuck on a box
+  let neck: THREE.Mesh | undefined;
+  if (spec.gait !== 'bird') {
+    neck = box(h.size * 0.6, h.size * 0.7, h.size * 0.65, b.col, headY - h.size * 0.3);
+    neck.position.z = b.d / 2 + h.size * 0.05;
+  }
   if (h.snout) {
     const sn = box(h.snout, h.snout * 0.7, h.snout, h.muzzleCol ?? h.col);
     sn.position.set(0, -0.02, h.size * 0.5 + h.snout * 0.3);
@@ -585,10 +592,14 @@ function buildCreature(spec: CreatureBlueprint): THREE.Group {
   for (const [x, z] of layout) {
     const leg = legMesh(L.thickness, L.length, L.col);
     leg.position.set(x, L.length, z);   // hip at the body underside
+    const hoof = box(L.thickness * 1.5, L.thickness, L.thickness * 1.9, 0x2a2018);
+    hoof.position.set(0, -L.length + L.thickness * 0.4, L.thickness * 0.3);
+    leg.add(hoof);                       // dark foot grounds the leg + adds detail
     legs.push(leg);
   }
 
   const parts: THREE.Object3D[] = [body, head, ...legs];
+  if (neck) parts.push(neck);
 
   let tail: THREE.Mesh | undefined;
   if (spec.tail) {
