@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { BuildingType } from '@lf/shared';
 import { assetInstance } from './assets';
+import { CREATURE_BLUEPRINTS, type CreatureBlueprint } from './creature-blueprints';
 
 /**
  * Procedural low-poly models — no external assets.
@@ -459,25 +460,6 @@ const FACTION_RING: Record<string, number> = {
   animal: 0x8aa84f, bandit: 0xe08a3a, zombie: 0x6f8f57, boss: 0xc43a31,
 };
 
-/** quadruped: box body + 4 legs + head; userData.legs/body for the walk animator. */
-function quadruped(bodyCol: number, headCol: number, opts: { big?: boolean; tail?: boolean } = {}): THREE.Group {
-  const s = opts.big ? 1.25 : 1;
-  const body = box(0.9 * s, 0.5 * s, 0.5 * s, bodyCol, 0.6 * s);
-  const head = box(0.4 * s, 0.4 * s, 0.4 * s, headCol, 0.7 * s);
-  head.position.z = 0.6 * s;
-  const legs: THREE.Mesh[] = [];
-  for (const [x, z] of [[-0.28, 0.28], [0.28, 0.28], [-0.28, -0.28], [0.28, -0.28]] as const) {
-    const leg = box(0.13 * s, 0.45 * s, 0.13 * s, headCol, 0.22 * s);
-    leg.position.set(x * s, 0, z * s);
-    legs.push(leg);
-  }
-  const parts: THREE.Object3D[] = [body, head, ...legs];
-  if (opts.tail) parts.push(at(box(0.1, 0.1, 0.4, bodyCol), 0, 0.6 * s, -0.55 * s));
-  const g = group(...parts);
-  g.userData.legs = legs; g.userData.body = body; g.userData.head = head;
-  return g;
-}
-
 function spiderModel(col: number): THREE.Group {
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 6), mat(col));
   body.position.y = 0.4; body.scale.y = 0.7;
@@ -494,6 +476,9 @@ function spiderModel(col: number): THREE.Group {
   for (const ex of [-0.08, 0.08]) head.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 3), mat(0xff3322, 0xff3322)), ex, 0.05, 0.18));
   const g = group(body, head, ...legs);
   g.userData.legs = legs.slice(0, 4); g.userData.body = body;
+  g.userData.rig = { legs: legs.slice(0, 8), body, head };
+  g.userData.gait = 'skitter';
+  g.userData.anim = { bob: 0.02, headBob: 0, tailSway: 0, cadence: 18 };
   return g;
 }
 
@@ -508,6 +493,9 @@ function snakeModel(col: number): THREE.Group {
   head.position.set(0, 0.2, 0.3); head.scale.z = 1.3;
   const g = group(head, ...segs);
   g.userData.body = head; g.userData.legs = [];
+  g.userData.rig = { legs: [], body: head, head, segments: segs };
+  g.userData.gait = 'slither';
+  g.userData.anim = { bob: 0, headBob: 0, tailSway: 0, cadence: 6 };
   return g;
 }
 
@@ -542,19 +530,94 @@ function zombieModel(col: number, scale: number): THREE.Group {
   return g;
 }
 
+/** A leg whose geometry pivots at the hip (top), so rotation.x swings the foot. */
+function legMesh(thick: number, len: number, col: number): THREE.Mesh {
+  const geo = new THREE.BoxGeometry(thick, len, thick);
+  geo.translate(0, -len / 2, 0);   // origin at the hip, mesh hangs down
+  return new THREE.Mesh(geo, mat(col));
+}
+
+function earMesh(kind: NonNullable<CreatureBlueprint['ears']>, col: number, side: number): THREE.Mesh {
+  switch (kind) {
+    case 'long':    return at(box(0.07, 0.34, 0.05, col), side * 0.1, 0.22, 0);
+    case 'pointed': return at(box(0.09, 0.16, 0.05, col), side * 0.16, 0.16, 0.02);
+    case 'round':   return at(new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 5), mat(col)), side * 0.2, 0.14, 0);
+    case 'floppy':  return at(box(0.1, 0.2, 0.05, col), side * 0.2, 0.02, 0);
+  }
+}
+
+/** Build a box-bodied animal (quad / hop / bird gaits) from a blueprint. */
+function buildCreature(spec: CreatureBlueprint): THREE.Group {
+  const b = spec.body, h = spec.head, L = spec.legs;
+  const bodyY = L.length + b.h / 2;
+
+  const body = box(b.w, b.h, b.d, b.col, bodyY);
+  if (b.round) body.scale.set(1.0, 0.92, 1.05);
+
+  // head at the front (+z); birds carry it higher on an upright neck
+  const headY = spec.gait === 'bird' ? bodyY + b.h * 0.75 : bodyY + b.h * 0.15;
+  const head = box(h.size, h.size, h.size, h.col, headY);
+  head.position.z = b.d / 2 + h.size * 0.25;
+  if (h.snout) {
+    const sn = box(h.snout, h.snout * 0.7, h.snout, h.muzzleCol ?? h.col);
+    sn.position.set(0, -0.02, h.size * 0.5 + h.snout * 0.3);
+    head.add(sn);
+  }
+  if (spec.ears) for (const side of [-1, 1] as const) head.add(earMesh(spec.ears, h.col, side));
+  if (spec.horns === 'cow') for (const side of [-1, 1] as const)
+    head.add(at(box(0.06, 0.18, 0.06, 0xece6d6), side * 0.16, 0.18, 0.02));
+  if (spec.horns === 'tusks') for (const side of [-1, 1] as const)
+    head.add(at(box(0.04, 0.04, 0.18, 0xf0ead8), side * 0.12, -0.08, h.size * 0.5));
+  if (spec.extras?.includes('comb')) head.add(at(box(0.05, 0.1, 0.16, 0xc43a31), 0, h.size * 0.55, 0));
+  if (spec.extras?.includes('beak')) head.add(at(box(0.07, 0.06, 0.12, 0xe0a040), 0, -0.02, h.size * 0.55));
+
+  // legs at the body corners (4) or under the hips (2, bird)
+  const legs: THREE.Mesh[] = [];
+  const lx = b.w * 0.34, lz = b.d * 0.32;
+  const layout: readonly (readonly [number, number])[] = L.count === 4
+    ? [[-lx, lz], [lx, lz], [-lx, -lz], [lx, -lz]]   // FL, FR, BL, BR
+    : [[-lx, 0], [lx, 0]];                            // L, R (bird)
+  for (const [x, z] of layout) {
+    const leg = legMesh(L.thickness, L.length, L.col);
+    leg.position.set(x, L.length, z);   // hip at the body underside
+    legs.push(leg);
+  }
+
+  const parts: THREE.Object3D[] = [body, head, ...legs];
+
+  let tail: THREE.Mesh | undefined;
+  if (spec.tail) {
+    const dims = spec.tail === 'bushy' ? [0.14, 0.14, 0.34] : spec.tail === 'thin' ? [0.07, 0.07, 0.34] : [0.12, 0.12, 0.14];
+    tail = box(dims[0]!, dims[1]!, dims[2]!, b.col, bodyY + b.h * 0.1);
+    tail.position.z = -(b.d / 2 + dims[2]! * 0.4);
+    parts.push(tail);
+  }
+  if (spec.extras?.includes('udder')) parts.push(at(box(0.22, 0.14, 0.3, 0xe7b8b8), 0, bodyY - b.h * 0.5, -b.d * 0.1));
+  if (spec.extras?.includes('hump')) parts.push(at(box(b.w * 0.7, 0.22, b.d * 0.5, b.col), 0, bodyY + b.h * 0.5, b.d * 0.15));
+  if (spec.extras?.includes('wool')) for (const [ox, oz] of [[-0.25, 0.2], [0.25, 0.2], [-0.25, -0.2], [0.25, -0.2], [0, 0]] as const)
+    parts.push(at(new THREE.Mesh(new THREE.SphereGeometry(0.26, 6, 5), mat(b.col)), ox * b.w, bodyY + b.h * 0.35, oz * b.d));
+
+  const g = group(...parts);
+  g.scale.setScalar(spec.scale);
+  body.userData.baseY = body.position.y;
+  head.userData.baseY = head.position.y;
+  g.userData.rig = { legs, body, head, tail };
+  g.userData.gait = spec.gait;
+  g.userData.anim = spec.anim;
+  // back-compat keys still read by older code paths
+  g.userData.legs = legs; g.userData.body = body; g.userData.head = head;
+  return g;
+}
+
 export function creatureModel(species: string): THREE.Group {
   const asset = assetInstance(`creature_${species}`);
   if (asset) return asset;
+
+  const bp = CREATURE_BLUEPRINTS[species];
+  if (bp) return buildCreature(bp);
+
   let g: THREE.Group;
   switch (species) {
-    case 'cow': g = quadruped(0x6b5640, 0xe8e2d4, { big: true, tail: true }); break;
-    case 'sheep': g = quadruped(0xe8e2d4, 0xcfc6b4, { tail: true }); break;
-    case 'pig': g = quadruped(0xd99a9a, 0xc78a8a, { tail: true }); break;
-    case 'boar': g = quadruped(0x5a4a3a, 0x4a3a2a, { tail: true }); break;
-    case 'wolf': g = quadruped(0x6a6f78, 0x565b64, { tail: true }); break;
-    case 'bear': g = quadruped(0x4a3a2a, 0x3a2c1e, { big: true }); break;
-    case 'chicken': g = quadruped(0xf0ead8, 0xe0a040, {}); g.scale.setScalar(0.7); break;
-    case 'rabbit': g = quadruped(0xcfc6b4, 0xe8e2d4, { tail: true }); g.scale.setScalar(0.6); break;
     case 'spider': g = spiderModel(0x2a2a32); break;
     case 'snake': g = snakeModel(0x4a7a3a); break;
     case 'bandit_sword': g = humanoidTinted(0x4a3a52, 'sword'); break;
@@ -567,7 +630,7 @@ export function creatureModel(species: string): THREE.Group {
     case 'warlock': g = humanoidTinted(0x2a1a42, 'staff'); g.scale.setScalar(1.6); break;
     case 'butcher': g = zombieModel(0x5d4a4a, 2.0); { const blade = box(0.2, 1.2, 0.45, 0x9aa3ab, 0.2); (g.userData.arms as THREE.Mesh[])[1]!.add(blade); } break;
     case 'spider_queen': g = spiderModel(0x3a1a2a); g.scale.setScalar(2.0); break;
-    default: g = quadruped(0x888888, 0x666666, {});
+    default: g = buildCreature(CREATURE_BLUEPRINTS.cow!);
   }
   return g;
 }
