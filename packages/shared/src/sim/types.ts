@@ -3,7 +3,7 @@ import type { Slot, ItemId } from './data/items';
 
 export interface Vec2 { x: number; y: number; }
 
-export type BuildingType = 'wood_wall' | 'stone_wall' | 'gate' | 'spike';
+export type BuildingType = 'wood_wall' | 'stone_wall' | 'gate' | 'spike' | 'crafting_table';
 export type Phase = 'day' | 'night';
 export type EntityId = number;
 
@@ -50,6 +50,7 @@ export interface DroppedItem {
   id: EntityId;
   item: ItemId;
   count: number;
+  dur?: number;
   pos: Vec2;
   ttlTicks: number;
 }
@@ -73,6 +74,8 @@ export type Command =
   | { kind: 'select_hand'; slot: number }
   | { kind: 'move_item'; from: number; to: number }
   | { kind: 'drop_item'; slot: number; count: number }
+  | { kind: 'craft'; recipeId: string }
+  | { kind: 'repair_hand' }
   | { kind: 'build'; type: BuildingType; pos: Vec2 }
   | { kind: 'demolish'; buildingId: EntityId };
 
@@ -85,6 +88,9 @@ export type SimEvent =
   | { kind: 'pickup'; pos: Vec2; item: ItemId; count: number; playerId: EntityId }
   | { kind: 'eat'; pos: Vec2; playerId: EntityId }
   | { kind: 'item_drop'; pos: Vec2; item: ItemId; count: number }
+  | { kind: 'craft'; pos: Vec2; item: ItemId }
+  | { kind: 'tool_broke'; pos: Vec2; item: ItemId; playerId: EntityId }
+  | { kind: 'repair'; pos: Vec2; playerId: EntityId }
   | { kind: 'build_placed'; pos: Vec2; type: BuildingType }
   | { kind: 'building_destroyed'; pos: Vec2; type: BuildingType }
   | { kind: 'player_died'; id: EntityId; pos: Vec2 }

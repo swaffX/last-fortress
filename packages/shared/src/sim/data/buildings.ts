@@ -13,4 +13,5 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   stone_wall: { size: 1, walkable: false, hp: 350, cost: { stone: 5 } },
   gate:       { size: 1, walkable: true,  hp: 150, cost: { wood: 6 } },
   spike:      { size: 1, walkable: false, hp: 80,  cost: { wood: 3, stone: 1 } },
+  crafting_table: { size: 1, walkable: false, hp: 60, cost: { crafting_table: 1 } },
 };

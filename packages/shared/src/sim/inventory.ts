@@ -1,4 +1,4 @@
-import { ITEMS, type ItemId, type Slot } from './data/items';
+import { ITEMS, isDurable, type ItemId, type Slot } from './data/items';
 
 /** Add `count` of `item`; returns the leftover that did not fit. */
 export function addItem(inv: Slot[], item: ItemId, count: number): number {
@@ -6,7 +6,7 @@ export function addItem(inv: Slot[], item: ItemId, count: number): number {
   // top up existing stacks first
   for (const s of inv) {
     if (count <= 0) break;
-    if (s && s.item === item && s.count < max) {
+    if (s && s.item === item && s.dur === undefined && s.count < max) {
       const room = max - s.count;
       const put = Math.min(room, count);
       s.count += put; count -= put;
@@ -64,4 +64,18 @@ export function moveSlot(inv: Slot[], from: number, to: number): void {
 
 export function emptyInventory(size: number): Slot[] {
   return Array.from({ length: size }, () => null as Slot);
+}
+
+/**
+ * Place `count` of `item` into the inventory. Durable items go one-per-slot
+ * with full durability; everything else stacks via addItem. Returns leftover.
+ */
+export function giveItem(inv: Slot[], item: ItemId, count: number): number {
+  if (!isDurable(item)) return addItem(inv, item, count);
+  const max = ITEMS[item].durabilityMax!;
+  let left = count;
+  for (let i = 0; i < inv.length && left > 0; i++) {
+    if (inv[i] === null) { inv[i] = { item, count: 1, dur: max }; left--; }
+  }
+  return left;
 }

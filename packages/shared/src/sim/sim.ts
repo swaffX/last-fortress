@@ -8,11 +8,12 @@ import { generateMap, type MapData } from './mapgen';
 import { generateRegions, regionAt, type RegionMap } from './regions';
 import { BUILDINGS } from './data/buildings';
 import { applySkills } from './data/skills';
-import { dist } from './combat';
-import { ITEMS, type ItemId, type Slot } from './data/items';
+import { dist, buildingCenter } from './combat';
+import { ITEMS, isDurable, type ItemId, type Slot } from './data/items';
 import {
-  addItem, removeItem, countItem, emptyInventory, moveSlot,
+  addItem, removeItem, countItem, emptyInventory, moveSlot, giveItem, firstEmpty,
 } from './inventory';
+import { recipeById } from './data/recipes';
 import {
   riverParams, inRiver, crossesBridgeRail, inRiverBand, type RiverParams,
 } from './river';
@@ -29,6 +30,8 @@ const NODE_ITEM: Record<ResourceNode['kind'], ItemId> = {
   tree: 'wood', rock: 'stone', bush: 'berry',
 };
 
+const CRAFT_TABLE_RANGE = 3.5;
+
 export class Sim {
   readonly state: SimState;
   readonly grid: Grid;
@@ -41,6 +44,8 @@ export class Sim {
   private lastRegion = new Map<EntityId, number>();
   private buildQueue: { playerId: EntityId; type: BuildingType; pos: Vec2 }[] = [];
   private demolishQueue: EntityId[] = [];
+  private craftQueue: { playerId: EntityId; recipeId: string }[] = [];
+  private repairQueue: EntityId[] = [];
 
   constructor(seed: number) {
     this.rng = new Rng(seed);
@@ -127,6 +132,8 @@ export class Sim {
         break;
       case 'move_item': moveSlot(p.inventory, cmd.from, cmd.to); break;
       case 'drop_item': this.dropFromSlot(p, cmd.slot, cmd.count); break;
+      case 'craft': this.craftQueue.push({ playerId, recipeId: cmd.recipeId }); break;
+      case 'repair_hand': this.repairQueue.push(playerId); break;
       case 'build': this.buildQueue.push({ playerId, type: cmd.type, pos: cmd.pos }); break;
       case 'demolish': this.demolishQueue.push(cmd.buildingId); break;
     }
@@ -137,6 +144,7 @@ export class Sim {
     this.state.tick++;
     this.stepClock(events);
     this.stepBuildCommands(events);
+    this.stepCraft(events);
     this.stepPlayers(events);
     this.stepGather(events);
     this.stepHunger(events);
@@ -180,6 +188,45 @@ export class Sim {
     this.demolishQueue.length = 0;
   }
 
+  private nearCraftingTable(p: Player): boolean {
+    for (const b of this.state.buildings.values()) {
+      if (b.type !== 'crafting_table') continue;
+      if (dist(buildingCenter(b.pos, 1), p.pos) <= CRAFT_TABLE_RANGE) return true;
+    }
+    return false;
+  }
+
+  private stepCraft(events: SimEvent[]): void {
+    for (const req of this.craftQueue) {
+      const p = this.state.players.get(req.playerId);
+      if (!p || !p.alive) continue;
+      const recipe = recipeById(req.recipeId);
+      if (!recipe) continue;
+      if (recipe.requiresTable && !this.nearCraftingTable(p)) continue;
+      if (!recipe.inputs.every(i => countItem(p.inventory, i.item) >= i.count)) continue;
+      for (const i of recipe.inputs) removeItem(p.inventory, i.item, i.count);
+      const leftover = giveItem(p.inventory, recipe.output.item, recipe.output.count);
+      if (leftover > 0) this.spawnGroundItem(recipe.output.item, leftover, p.pos);
+      events.push({ kind: 'craft', pos: { ...p.pos }, item: recipe.output.item });
+    }
+    this.craftQueue.length = 0;
+
+    for (const id of this.repairQueue) {
+      const p = this.state.players.get(id);
+      if (!p || !p.alive) continue;
+      const s = p.inventory[p.hand];
+      if (!s || !isDurable(s.item) || s.dur === undefined) continue;
+      const def = ITEMS[s.item];
+      if (def.durabilityMax === undefined || s.dur >= def.durabilityMax) continue;
+      const mat = def.repairItem, cost = def.repairCost ?? 1;
+      if (!mat || countItem(p.inventory, mat) < cost) continue;
+      removeItem(p.inventory, mat, cost);
+      s.dur = def.durabilityMax;
+      events.push({ kind: 'repair', pos: { ...p.pos }, playerId: p.id });
+    }
+    this.repairQueue.length = 0;
+  }
+
   private canAffordBuild(p: Player, cost: Partial<Record<ItemId, number>>): boolean {
     for (const [item, n] of Object.entries(cost)) {
       if (countItem(p.inventory, item as ItemId) < n!) return false;
@@ -196,9 +243,23 @@ export class Sim {
       const center = { x: node.pos.x + 0.5, y: node.pos.y + 0.5 };
       if (dist(center, p.pos) > GATHER_RANGE + 0.4) { p.gatherTarget = null; continue; }
       if (p.gatherCooldown > 0) continue;
-      p.gatherCooldown = GATHER_COOLDOWN;
-      const take = Math.min(BARE_HAND_YIELD, node.amount);
+      const held = p.inventory[p.hand];
+      const heldDef = held ? ITEMS[held.item] : undefined;
+      const matches = !!heldDef && heldDef.toolKind ===
+        (node.kind === 'tree' ? 'axe' : node.kind === 'rock' ? 'pick' : undefined);
+      const mul = matches ? (heldDef!.gatherMul ?? 1) : 1;
+      p.gatherCooldown = matches ? Math.max(4, Math.round(GATHER_COOLDOWN / 1.5)) : GATHER_COOLDOWN;
+      const take = Math.min(BARE_HAND_YIELD * mul, node.amount);
       node.amount -= take;
+      // wear the tool when it was the right tool for the job
+      if (matches && held && held.dur !== undefined) {
+        held.dur -= 1;
+        if (held.dur <= 0) {
+          const broken = held.item;
+          p.inventory[p.hand] = null;
+          events.push({ kind: 'tool_broke', pos: { ...p.pos }, item: broken, playerId: p.id });
+        }
+      }
       const item = NODE_ITEM[node.kind];
       const leftover = addItem(p.inventory, item, take);
       if (leftover > 0) this.spawnGroundItem(item, leftover, p.pos);
@@ -236,7 +297,14 @@ export class Sim {
       for (const p of this.state.players.values()) {
         if (!p.alive) continue;
         if (dist(p.pos, gi.pos) > PICKUP_RANGE) continue;
-        const leftover = addItem(p.inventory, gi.item, gi.count);
+        let leftover: number;
+        if (isDurable(gi.item)) {
+          const slot = firstEmpty(p.inventory);
+          if (slot < 0) { leftover = gi.count; }
+          else { p.inventory[slot] = { item: gi.item, count: 1, dur: gi.dur }; leftover = gi.count - 1; }
+        } else {
+          leftover = addItem(p.inventory, gi.item, gi.count);
+        }
         const got = gi.count - leftover;
         if (got > 0) events.push({ kind: 'pickup', pos: { ...gi.pos }, item: gi.item, count: got, playerId: p.id });
         gi.count = leftover;
@@ -280,7 +348,7 @@ export class Sim {
 
   private killPlayer(p: Player, events: SimEvent[]): void {
     p.alive = false; p.hp = 0; p.respawnTicks = RESPAWN_TICKS; p.gatherTarget = null;
-    const drop = (s: Slot) => { if (s) this.spawnGroundItem(s.item, s.count, p.pos); };
+    const drop = (s: Slot) => { if (s) this.spawnGroundItem(s.item, s.count, p.pos, s.dur); };
     for (let i = 0; i < p.inventory.length; i++) { drop(p.inventory[i]!); p.inventory[i] = null; }
     drop(p.equipment.head); drop(p.equipment.body); drop(p.equipment.legs);
     p.equipment = { head: null, body: null, legs: null };
@@ -301,15 +369,15 @@ export class Sim {
     if (!s) return;
     const n = Math.min(count, s.count);
     if (n <= 0) return;
-    this.spawnGroundItem(s.item, n, { x: p.pos.x, y: p.pos.y });
+    this.spawnGroundItem(s.item, n, { x: p.pos.x, y: p.pos.y }, s.dur);
     s.count -= n;
     if (s.count <= 0) p.inventory[slot] = null;
   }
 
-  private spawnGroundItem(item: ItemId, count: number, pos: Vec2): void {
+  private spawnGroundItem(item: ItemId, count: number, pos: Vec2, dur?: number): void {
     const id = this.state.nextId++;
     this.state.groundItems.set(id, {
-      id, item, count, ttlTicks: ITEM_TTL_TICKS,
+      id, item, count, dur, ttlTicks: ITEM_TTL_TICKS,
       pos: { x: pos.x + (this.rng.next() - 0.5) * 0.6, y: pos.y + (this.rng.next() - 0.5) * 0.6 },
     });
   }
