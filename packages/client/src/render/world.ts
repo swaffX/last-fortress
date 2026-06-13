@@ -346,11 +346,10 @@ export class World {
         const walk = mixer.clipAction(walkC);
         walk.play(); walk.setEffectiveWeight(0);
         t.actWalk = walk;
+      } else {
+        // no skeletal walk (pig/sheep) → procedural waddle carries the motion
+        t.bobWalk = true;
       }
-      // every GLB animal gets a procedural body bounce while moving — guarantees a
-      // sense of motion (legs come from the mixer when a walk clip exists; this sells
-      // the gait either way and hides snapshot-interpolation stutter)
-      t.bobWalk = true;
     }
     this.tracked.set(id, t);
     return t;
@@ -538,7 +537,7 @@ export class World {
         if (t.swingHeading !== null) { if (t.attackT > 0) t.targetHeading = t.swingHeading; else t.swingHeading = null; }
         this.applyHeading(t, dt, (this.aimHeading !== null || t.swingHeading !== null) ? 26 : 12);
         this.applyDeckHeight(t, dt);
-        if (t.mixer) this.tickMixer(t, moving, dt); else this.animateCharacter(t, moving, dt);
+        if (t.mixer) this.tickMixer(t, moving ? 6 : 0, dt); else this.animateCharacter(t, moving, dt);
         continue;
       }
 
@@ -553,7 +552,8 @@ export class World {
           t.obj.position.y = 1.1;   // projectiles fly chest-height
         } else {
           this.applyDeckHeight(t, dt);
-          if (t.mixer) this.tickMixer(t, moving, dt); else this.animateCharacter(t, moving, dt);
+          const moveSpeed = Math.hypot(dx, dz) / Math.max(0.02, this.frameInterval);
+          if (t.mixer) this.tickMixer(t, moveSpeed, dt); else this.animateCharacter(t, moving, dt);
         }
       } else {
         this.animateBuilding(t, dt);
@@ -620,30 +620,31 @@ export class World {
     }
   }
 
-  /** Advance a GLB creature's mixer, crossfading idle⇄walk (or a procedural waddle). */
-  private tickMixer(t: Tracked, moving: boolean, dt: number): void {
+  /** Advance a GLB creature's mixer; leg cadence + weight + waddle all scale with ground speed. */
+  private tickMixer(t: Tracked, speed: number, dt: number): void {
     if (!t.mixer) return;
+    const k = Math.min(1, dt * 6);
     if (t.actWalk && t.actIdle) {
-      const cur = t.actWalk.getEffectiveWeight();
-      const w = cur + ((moving ? 1 : 0) - cur) * Math.min(1, dt * 8);
+      // blend toward walk by speed; play the legs at the cadence of the actual travel
+      const target = Math.min(1, speed / 1.4);
+      const w = t.actWalk.getEffectiveWeight() + (target - t.actWalk.getEffectiveWeight()) * k;
       t.actWalk.setEffectiveWeight(w);
       t.actIdle.setEffectiveWeight(1 - w);
+      t.actWalk.timeScale = THREE.MathUtils.clamp(speed / 1.8, 0.55, 2.4);   // no foot sliding
     }
     t.mixer.update(dt);
     if (t.bobWalk) {
       const bob = t.obj.userData.bobNode as THREE.Object3D | undefined;
       if (bob) {
         const baseY = (t.obj.userData.baseY as number) ?? 0;
-        const k = Math.min(1, dt * 8);
-        if (moving) {
-          const ph = this.time * 12 + t.animT * 10;
-          bob.position.y = baseY + Math.abs(Math.sin(ph)) * 0.09;   // hooved bounce
-          bob.rotation.z = Math.sin(ph) * 0.06;                     // side waddle
-          bob.rotation.x += (0.07 - bob.rotation.x) * k;            // lean into the stride
+        if (speed > 0.15) {
+          const ph = this.time * (7 + speed * 3.5) + t.animT * 10;
+          const amp = Math.min(0.13, 0.04 + speed * 0.035);
+          bob.position.y = baseY + Math.abs(Math.sin(ph)) * amp;
+          bob.rotation.z = Math.sin(ph) * Math.min(0.08, speed * 0.04);
         } else {
           bob.position.y += (baseY - bob.position.y) * k;
           bob.rotation.z += (0 - bob.rotation.z) * k;
-          bob.rotation.x += (0 - bob.rotation.x) * k;
         }
       }
     }
