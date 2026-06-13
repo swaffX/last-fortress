@@ -36,6 +36,34 @@ export interface Player {
   temperature: number;     // 0..100 placeholder, inert until Phase 4
   gatherCooldown: number;
   gatherTarget: EntityId | null;
+  attackCooldown: number;          // swing cooldown ticks
+}
+
+export type ProjectileKind = 'spit' | 'bolt';
+
+export interface Creature {
+  id: EntityId;
+  species: string;                 // CREATURES key
+  pos: Vec2;
+  hp: number;
+  maxHp: number;
+  target: EntityId | null;
+  attackCooldown: number;
+  provoked: boolean;               // neutral creatures engage once hit
+  fleeTicks: number;               // herbivore panic timer
+  wanderDir: Vec2;
+  biome: string;
+}
+
+export interface Projectile {
+  id: EntityId;
+  kind: ProjectileKind;
+  pos: Vec2;
+  dir: Vec2;                       // normalized travel
+  speed: number;
+  dmg: number;
+  fromPlayer: boolean;             // true = player shot (hits creatures)
+  ttlTicks: number;
 }
 
 export interface ResourceNode {
@@ -64,6 +92,8 @@ export interface SimState {
   players: Map<EntityId, Player>;
   nodes: Map<EntityId, ResourceNode>;
   groundItems: Map<EntityId, DroppedItem>;
+  creatures: Map<EntityId, Creature>;
+  projectiles: Map<EntityId, Projectile>;
   nextId: EntityId;
 }
 
@@ -76,6 +106,7 @@ export type Command =
   | { kind: 'drop_item'; slot: number; count: number }
   | { kind: 'craft'; recipeId: string }
   | { kind: 'repair_hand' }
+  | { kind: 'attack'; dir: Vec2 }
   | { kind: 'build'; type: BuildingType; pos: Vec2 }
   | { kind: 'demolish'; buildingId: EntityId };
 
@@ -96,4 +127,8 @@ export type SimEvent =
   | { kind: 'player_died'; id: EntityId; pos: Vec2 }
   | { kind: 'player_respawn'; id: EntityId; pos: Vec2 }
   | { kind: 'region_enter'; id: EntityId; region: string }
+  | { kind: 'swing'; pos: Vec2; dir: Vec2 }
+  | { kind: 'creature_spawn'; id: EntityId; species: string; pos: Vec2 }
+  | { kind: 'creature_death'; id: EntityId; species: string; pos: Vec2 }
+  | { kind: 'projectile'; from: Vec2; to: Vec2; kind2: ProjectileKind }
   | { kind: 'phase_change'; phase: Phase };
