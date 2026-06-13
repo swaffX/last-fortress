@@ -695,8 +695,84 @@ export class World {
     }
   }
 
+  /** Animate a blueprint/rig creature: speed-driven gait + idle, by gait type. */
+  private animateCreature(t: Tracked, moving: boolean, dt: number): void {
+    const u = t.obj.userData;
+    const rig = u.rig as {
+      legs: THREE.Mesh[]; body: THREE.Mesh; head: THREE.Mesh;
+      tail?: THREE.Mesh; segments?: THREE.Mesh[];
+    };
+    const anim = u.anim as { bob: number; headBob: number; tailSway: number; cadence: number };
+    const gait = u.gait as 'quad' | 'hop' | 'bird' | 'skitter' | 'slither';
+    if (!rig || !rig.body) return;
+
+    // dead enemies fall away (removed server-side shortly after)
+    if (t.deadT > 0) { t.obj.rotation.x = -Math.PI / 2 * Math.min(1, t.deadT); return; }
+    t.obj.rotation.x = 0;
+
+    // ground speed from the interpolation delta → stride rate (0 still .. ~2 sprint)
+    const dx = t.to.x - t.from.x, dz = t.to.z - t.from.z;
+    const speed = Math.hypot(dx, dz) / Math.max(0.02, this.frameInterval);
+    const sr = Math.min(2, speed / 3);
+    const active = moving && sr > 0.05;
+
+    // gait phase accumulates at a speed-scaled cadence (continuous frequency)
+    t.animT += dt * anim.cadence * (active ? 0.5 + sr : 0.0);
+    const sw = Math.sin(t.animT);
+    const amp = 0.25 + sr * 0.55;
+    const legs = rig.legs, body = rig.body, head = rig.head;
+    const bodyY = (body.userData.baseY as number) ?? body.position.y;
+    const headY = (head?.userData.baseY as number) ?? (head ? head.position.y : 0);
+
+    if (gait === 'slither') {
+      const segs = rig.segments ?? [];
+      for (let i = 0; i < segs.length; i++) segs[i]!.position.x = Math.sin(this.time * 4 + i * 0.9) * 0.12 * (active ? 1 : 0.4);
+      if (head) head.position.x = Math.sin(this.time * 4 + 1) * 0.1 * (active ? 1 : 0.4);
+      return;
+    }
+    if (gait === 'skitter') {
+      for (let i = 0; i < legs.length; i++) legs[i]!.rotation.x = Math.sin(t.animT + i * 0.8) * 0.25 * (active ? 1 : 0.25);
+      body.position.y = bodyY + Math.abs(Math.sin(t.animT)) * anim.bob * (active ? 1 : 0);
+      return;
+    }
+    if (gait === 'hop') {
+      const hop = Math.abs(Math.sin(t.animT));
+      for (const leg of legs) leg.rotation.x = active ? -hop * 0.6 : 0;
+      body.position.y = bodyY + (active ? hop * 0.28 * sr : Math.sin(this.time * 1.6) * 0.01);
+      if (head) head.position.y = headY + (active ? hop * 0.1 : Math.sin(this.time * 1.2) * 0.01);
+      this.creatureSecondary(rig, anim);
+      return;
+    }
+
+    if (active) {
+      if (gait === 'bird') {
+        legs[0]!.rotation.x = sw * amp; if (legs[1]) legs[1].rotation.x = -sw * amp;
+        body.rotation.z = sw * 0.05;
+        if (head) head.position.y = headY - Math.abs(sw) * anim.headBob;   // peck bob
+      } else { // quad: diagonal pairs
+        legs[0]!.rotation.x = sw * amp; if (legs[3]) legs[3].rotation.x = sw * amp;
+        if (legs[1]) legs[1].rotation.x = -sw * amp; if (legs[2]) legs[2].rotation.x = -sw * amp;
+        body.position.y = bodyY + Math.abs(Math.sin(t.animT)) * anim.bob * (0.4 + sr);
+        body.rotation.z = sw * 0.03;
+        if (head) head.position.y = headY + Math.abs(sw) * anim.headBob;
+      }
+    } else {
+      for (const leg of legs) leg.rotation.x = 0;
+      body.position.y = bodyY + Math.sin(this.time * 1.6) * anim.bob * 0.3;
+      body.rotation.z = Math.sin(this.time * 0.8) * 0.02;
+      if (head) { head.position.y = headY; head.rotation.y = Math.sin(this.time * 0.5) * 0.3; }
+    }
+    this.creatureSecondary(rig, anim);
+  }
+
+  /** Always-on secondary motion: tail sway (low frequency, this.time clock). */
+  private creatureSecondary(rig: { tail?: THREE.Mesh }, anim: { tailSway: number }): void {
+    if (rig.tail) rig.tail.rotation.y = Math.sin(this.time * 2.2) * anim.tailSway;
+  }
+
   private animateCharacter(t: Tracked, moving: boolean, dt: number): void {
     this.applyHitFlash(t, dt);
+    if (t.obj.userData.gait) { this.animateCreature(t, moving, dt); return; }
     const u = t.obj.userData;
     const legs = u.legs as THREE.Mesh[] | undefined;
     const arms = u.arms as THREE.Mesh[] | undefined;
