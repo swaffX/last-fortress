@@ -32,4 +32,6 @@ export class Grid {
     if (!this.inBounds({ x, y })) return 0;
     return this.cells[this.idx(x, y)]!;
   }
+  /** Clear all occupancy — used when rebuilding from a saved world. */
+  reset(): void { this.cells.fill(0); }
 }

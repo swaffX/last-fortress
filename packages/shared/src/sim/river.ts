@@ -1,6 +1,6 @@
 import type { Vec2 } from './types';
 import { Rng } from './rng';
-import { MAP_SIZE, CASTLE_POS } from './constants';
+import { MAP_SIZE, CAMP_POS } from './constants';
 
 /**
  * The river is derived deterministically from the game seed by both the
@@ -32,7 +32,7 @@ export function riverParams(seed: number): RiverParams {
 }
 
 export function riverYAt(x: number, p: RiverParams): number {
-  return CASTLE_POS.y + 2 + p.offset + Math.sin(x * p.freq + p.phase) * p.amp;
+  return CAMP_POS.y + p.offset + Math.sin(x * p.freq + p.phase) * p.amp;
 }
 
 export function onBridge(pos: Vec2): boolean {

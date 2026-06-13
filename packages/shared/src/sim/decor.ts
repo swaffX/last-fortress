@@ -1,6 +1,6 @@
 import type { Vec2 } from './types';
 import { Rng } from './rng';
-import { MAP_SIZE, CASTLE_POS } from './constants';
+import { MAP_SIZE, CAMP_POS } from './constants';
 import { inRiverBand, type RiverParams } from './river';
 
 /**
@@ -18,7 +18,7 @@ export interface Decor {
   r: number;
 }
 
-const CX = CASTLE_POS.x + 2, CY = CASTLE_POS.y + 2;
+const CX = CAMP_POS.x, CY = CAMP_POS.y;
 
 export function generateDecor(seed: number, river: RiverParams,
                               nodes: { pos: Vec2 }[]): Decor[] {

@@ -1,143 +1,93 @@
 import type { SkillModifiers } from './data/skills';
+import type { Slot, ItemId } from './data/items';
 
 export interface Vec2 { x: number; y: number; }
 
-export type ResourceKind = 'wood' | 'stone' | 'gold' | 'coins';
-export type Resources = Record<ResourceKind, number>;
-
-export type BuildingType =
-  | 'wood_wall' | 'stone_wall' | 'gate' | 'spike'
-  | 'archer_tower' | 'crossbow_tower' | 'bomb_tower' | 'ice_tower' | 'lightning_tower'
-  | 'gold_mine' | 'wood_camp' | 'stone_quarry'
-  | 'healing_totem'
-  | 'castle';
-
-export type EnemyType = 'normal' | 'fast' | 'tank' | 'spitter' | 'exploding' | 'butcher';
-export type ClassType = 'knight' | 'hunter';
-export type WeaponType = 'sword' | 'bow' | 'crossbow';
+export type BuildingType = 'wood_wall' | 'stone_wall' | 'gate' | 'spike';
 export type Phase = 'day' | 'night';
-
 export type EntityId = number;
 
 export interface Building {
   id: EntityId;
   type: BuildingType;
-  tier: number;            // 1..3 (castle: level 1..5)
-  pos: Vec2;               // grid cell of footprint origin (top-left)
+  pos: Vec2;               // grid cell (top-left of footprint)
   hp: number;
   maxHp: number;
-  cooldown: number;        // ticks until next action (tower fire / income)
 }
 
-export interface Enemy {
-  id: EntityId;
-  type: EnemyType;
-  pos: Vec2;               // world position (float, world units == grid cells)
-  hp: number;
-  maxHp: number;
-  speedMul: number;        // 1 normally, <1 while slowed
-  slowTicks: number;
-  attackCooldown: number;
-  targetBuildingId: EntityId | null;
-  enraged: boolean;        // butcher phase 2
+export interface Equipment {
+  head: Slot;
+  body: Slot;
+  legs: Slot;
 }
 
 export interface Player {
   id: EntityId;
-  klass: ClassType;
-  weapon: WeaponType;
   pos: Vec2;
   hp: number;
   maxHp: number;
-  attackCooldown: number;
   alive: boolean;
   respawnTicks: number;
   mods: SkillModifiers;
-  axeTier: number;         // 1..3 — wood yield
-  pickTier: number;        // 1..3 — stone yield
-  gatherCooldown: number;  // separate from combat so E always responds
-  gatherTarget: EntityId | null;   // channeling: keeps swinging until done or moved
-  combatLevel: number;             // per-match strike upgrades bought with gold
+  inventory: Slot[];       // length INVENTORY_SLOTS (0..8 hotbar, 9..35 backpack)
+  equipment: Equipment;    // inert in Phase 0
+  hand: number;            // selected hotbar index 0..8
+  hunger: number;          // 0..100
+  temperature: number;     // 0..100 placeholder, inert until Phase 4
+  gatherCooldown: number;
+  gatherTarget: EntityId | null;
 }
 
 export interface ResourceNode {
   id: EntityId;
-  kind: 'tree' | 'rock';
-  pos: Vec2;               // grid cell
-  amount: number;          // remaining harvestable amount
+  kind: 'tree' | 'rock' | 'bush';
+  pos: Vec2;
+  amount: number;
+  regrowTicks: number;     // bushes regrow; 0 = ready/non-regrowing
+}
+
+export interface DroppedItem {
+  id: EntityId;
+  item: ItemId;
+  count: number;
+  pos: Vec2;
+  ttlTicks: number;
 }
 
 export interface SimState {
   tick: number;
+  worldSeed: number;
   phase: Phase;
-  phaseTicks: number;      // ticks remaining in current phase
-  wave: number;            // last started wave number (0 before first night)
-  pendingSpawns: { type: EnemyType; atTick: number }[];
-  resources: Resources;    // shared team economy
+  phaseTicks: number;
   buildings: Map<EntityId, Building>;
-  enemies: Map<EntityId, Enemy>;
   players: Map<EntityId, Player>;
   nodes: Map<EntityId, ResourceNode>;
-  projectiles: Map<EntityId, Projectile>;
-  bonuses: TeamBonuses;
-  castleId: EntityId;
+  groundItems: Map<EntityId, DroppedItem>;
   nextId: EntityId;
-  gameOver: boolean;
-}
-
-export type ProjectileKind = 'arrow' | 'bolt' | 'spit' | 'bomb';
-
-/** In-flight projectile — damage lands on impact, not on fire. */
-export interface Projectile {
-  id: EntityId;
-  kind: ProjectileKind;
-  pos: Vec2;
-  speed: number;          // world units per second
-  dmg: number;
-  crit: boolean;
-  targetEnemy: EntityId | null;
-  targetPlayer: EntityId | null;
-  targetBuilding: EntityId | null;
-  targetPos: Vec2;        // fallback aim point (target died) / bomb ground aim
-  aoeRadius?: number;     // bomb
-  slowMul?: number;
-  slowTicks?: number;
-}
-
-/** Team-wide modifiers from wave-vote upgrades. */
-export interface TeamBonuses {
-  playerDmgMul: number;
-  towerDmgMul: number;
-  enemyDmgMul: number;    // <1 = weakened enemies
-  incomeMul: number;
-  coinMul: number;
-  playerSpeedMul: number;
 }
 
 export type Command =
-  | { kind: 'move'; dir: Vec2 }                                  // dir normalized client-side; re-normalized in sim
-  | { kind: 'attack'; dir: Vec2 }                                // legacy no-op (combat is automatic)
-  | { kind: 'gather' }                                           // E key: harvest nearest node in reach
-  | { kind: 'upgrade_combat' }                                   // strike upgrade, costs team coins
-  | { kind: 'upgrade_tool'; tool: 'axe' | 'pick' }               // crafted from team wood/stone
+  | { kind: 'move'; dir: Vec2 }
+  | { kind: 'gather' }
+  | { kind: 'eat' }
+  | { kind: 'select_hand'; slot: number }
+  | { kind: 'move_item'; from: number; to: number }
+  | { kind: 'drop_item'; slot: number; count: number }
   | { kind: 'build'; type: BuildingType; pos: Vec2 }
-  | { kind: 'upgrade'; buildingId: EntityId }
   | { kind: 'demolish'; buildingId: EntityId };
 
 export type SimEvent =
-  | { kind: 'projectile'; from: Vec2; to: Vec2; weapon: 'arrow' | 'bolt' | 'bomb' | 'ice' | 'lightning' | 'spit' }
   | { kind: 'damage'; pos: Vec2; amount: number; crit: boolean }
   | { kind: 'melee'; pos: Vec2 }
-  | { kind: 'splash'; pos: Vec2 }
   | { kind: 'node_depleted'; nodeId: EntityId; pos: Vec2 }
-  | { kind: 'gather'; pos: Vec2; resource: 'wood' | 'stone'; amount: number;
+  | { kind: 'gather'; pos: Vec2; resource: ItemId; amount: number;
       nodeId: EntityId; remaining: number }
-  | { kind: 'explosion'; pos: Vec2; radius: number }
-  | { kind: 'chain'; points: Vec2[] }
-  | { kind: 'death'; pos: Vec2; enemy: EnemyType }
-  | { kind: 'coins'; pos: Vec2; amount: number }
+  | { kind: 'pickup'; pos: Vec2; item: ItemId; count: number; playerId: EntityId }
+  | { kind: 'eat'; pos: Vec2; playerId: EntityId }
+  | { kind: 'item_drop'; pos: Vec2; item: ItemId; count: number }
   | { kind: 'build_placed'; pos: Vec2; type: BuildingType }
   | { kind: 'building_destroyed'; pos: Vec2; type: BuildingType }
-  | { kind: 'wave_start'; wave: number; boss: boolean }
-  | { kind: 'phase_change'; phase: Phase }
-  | { kind: 'game_over'; wave: number };
+  | { kind: 'player_died'; id: EntityId; pos: Vec2 }
+  | { kind: 'player_respawn'; id: EntityId; pos: Vec2 }
+  | { kind: 'region_enter'; id: EntityId; region: string }
+  | { kind: 'phase_change'; phase: Phase };
